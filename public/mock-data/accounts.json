@@ -1,0 +1,6 @@
+[
+  {"id":"acc_1","name":"Checking","balance":4200.50,"currency":"USD"},
+  {"id":"acc_2","name":"Savings","balance":15000.00,"currency":"USD"},
+  {"id":"acc_3","name":"Investment","balance":25000.75,"currency":"USD"},
+  {"id":"acc_4","name":"Retirement","balance":50000.00,"currency":"USD"}
+]
