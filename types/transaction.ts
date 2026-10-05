@@ -3,6 +3,10 @@ export type Transaction = {
   id: string;
   accountId: string;
   amount: number; // dollars for UI (positive for credit, negative for debit)
+  amountCents?: number;
+  currency?: string;
+  category?: string;
+  transferId?: string | null;
   description?: string;
   createdAt: string; // ISO timestamp
   metadata?: Record<string, unknown>;

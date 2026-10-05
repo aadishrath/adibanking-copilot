@@ -11,9 +11,12 @@ export type Account = {
   id: string;
   name: string;
   balance: number; // dollars (e.g., 1234.56) — for display only
+  balanceCents?: number;
   currency: Currency;
   createdAt?: string; // ISO timestamp
   userId?: string;
+  accountType?: 'checking' | 'savings';
+  status?: 'active' | 'frozen' | 'closed';
 };
 
 /**

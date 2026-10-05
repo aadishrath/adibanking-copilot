@@ -1,31 +1,33 @@
 import './globals.css';
-import { ReactNode } from 'react';
-import ChatbotWidget from '../components/ui/ChatbotWidget.tsx';
+import type { ReactNode } from 'react';
+import type { Viewport } from 'next';
+import ChatbotWidget from '@/components/ui/ChatbotWidget';
+import Navbar from '@/components/layout/Navbar';
+import { getViewer } from '@/lib/auth/session';
+import { canAccess } from '@/lib/auth/roles';
 
 export const metadata = {
-  title: 'Adibank Clone',
+  title: 'AdiBank',
   description: 'Demo banking app with AI assistant',
 };
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', interactiveWidget: 'resizes-visual' };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const viewer = await getViewer();
   return (
     <html lang="en">
       <body>
         <div className="min-h-screen flex flex-col">
-          <header className="bg-white shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 py-4">
-              <h1 className="text-lg font-semibold">Adibank Clone</h1>
-            </div>
-          </header>
+          <Navbar key={viewer?.id ?? 'guest'} viewer={viewer} />
 
-          <main className="flex-1 max-w-7xl mx-auto px-4 py-6">{children}</main>
+          <main className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-6 sm:px-6">{children}</main>
 
           <footer className="bg-white border-t">
-            <div className="max-w-7xl mx-auto px-4 py-4 text-sm text-slate-500">© Demo</div>
+            <div className={`mx-auto max-w-7xl px-4 pt-4 text-center text-sm text-slate-500 sm:px-6 ${viewer?'pb-24':'pb-4'}`}>© {new Date().getFullYear()} aadish. Built by aadish. For demonstration purposes only.</div>
           </footer>
         </div>
 
-        <ChatbotWidget />
+        {viewer && canAccess(viewer.role, 'assistant') && <ChatbotWidget key={viewer.id} userId={viewer.id} />}
       </body>
     </html>
   );

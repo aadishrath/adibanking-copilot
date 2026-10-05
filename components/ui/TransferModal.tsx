@@ -1,35 +1,37 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
-import { Account } from '../../types/account.ts';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { Account } from '@/types/account';
+import type { Transaction } from '@/types/transaction';
+import { parseAmountCents } from '@/lib/money';
 
 interface TransferModalProps {
   accounts: Account[];
-  onSuccess?: (result: { fromId: string; toId: string; amount: number; newTransactions?: any[] }) => void;
+  onSuccess?: (result: { accounts: Account[]; transactions: Transaction[] }) => void;
   defaultFrom?: string;
   defaultTo?: string;
 };
 
 
 export default function TransferModal({ accounts, onSuccess, defaultFrom, defaultTo }: TransferModalProps) {
+  const formId = useId();
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState<string>(defaultFrom ?? accounts?.[0]?.id ?? '');
   const [to, setTo] = useState<string>(defaultTo ?? accounts?.[1]?.id ?? accounts?.[0]?.id ?? '');
   const [amount, setAmount] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const requestKey = useRef('');
+  const pendingRef = useRef(false);
 
   // Accessibility / focus management
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
-  const firstInputRef = useRef<HTMLSelectElement | HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    setFrom(defaultFrom ?? accounts?.[0]?.id ?? '');
-    setTo(defaultTo ?? accounts?.[1]?.id ?? accounts?.[0]?.id ?? '');
-  }, [defaultFrom, defaultTo, accounts]);
+  const firstInputRef = useRef<HTMLSelectElement | null>(null);
 
   useEffect(() => {
     if (open) {
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
       // focus first input when modal opens
       setTimeout(() => firstInputRef.current?.focus(), 0);
       const onKey = (e: KeyboardEvent) => {
@@ -37,7 +39,7 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
         if (e.key === 'Tab') {
           // simple focus trap
           const focusable = modalRef.current?.querySelectorAll<HTMLElement>(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
           );
           if (!focusable || focusable.length === 0) return;
           const first = focusable[0];
@@ -52,16 +54,22 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
         }
       };
       document.addEventListener('keydown', onKey);
-      return () => document.removeEventListener('keydown', onKey);
+      return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = previousOverflow; };
     }
   }, [open]);
 
   function openModal() {
+    requestKey.current = crypto.randomUUID();
+    // Initialize from the latest accounts when opening, without resetting edits
+    // whenever the parent refreshes its account array.
+    setFrom(defaultFrom ?? accounts[0]?.id ?? '');
+    setTo(defaultTo ?? accounts[1]?.id ?? accounts[0]?.id ?? '');
     setError(null);
     setOpen(true);
   }
 
   function close() {
+    if (pendingRef.current) return;
     setOpen(false);
     setAmount('');
     setError(null);
@@ -72,15 +80,18 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
   function validate(): { ok: boolean; message?: string } {
     if (!from || !to) return { ok: false, message: 'Select both accounts.' };
     if (from === to) return { ok: false, message: 'From and To accounts must be different.' };
-    const n = Number(amount);
-    if (Number.isNaN(n) || n <= 0) return { ok: false, message: 'Enter a valid positive amount.' };
+    let cents: number;
+    try { cents = parseAmountCents(amount); } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Invalid amount.' }; }
     const fromAcc = accounts.find(a => a.id === from);
     if (!fromAcc) return { ok: false, message: 'Source account not found.' };
-    if (n > Number(fromAcc.balance)) return { ok: false, message: 'Insufficient funds in source account.' };
+    const toAcc = accounts.find(a => a.id === to);
+    if (!toAcc || toAcc.currency !== fromAcc.currency) return { ok: false, message: 'Select accounts with matching currencies.' };
+    if (cents > (fromAcc.balanceCents ?? Math.round(fromAcc.balance * 100))) return { ok: false, message: 'Insufficient funds in source account.' };
     return { ok: true };
   }
 
   async function submit() {
+    if (pendingRef.current) return;
     setError(null);
     const v = validate();
     if (!v.ok) {
@@ -88,38 +99,32 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
       return;
     }
 
-    const n = Number(amount);
+    const cents = parseAmountCents(amount);
+    pendingRef.current = true;
     setLoading(true);
 
-    // Optimistic UI: call onSuccess immediately to update parent UI
     try {
-      onSuccess?.({ fromId: from, toId: to, amount: n });
-
-      // Call server API to perform transfer (atomic server-side)
+      // Update the dashboard only after the server confirms success.
       const res = await fetch('/api/transfer', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ fromId: from, toId: to, amount: n }),
+        body: JSON.stringify({ fromId: from, toId: to, amountCents: cents, idempotencyKey: requestKey.current }),
       });
 
-      const json = await res.json();
+      const json = res.headers.get('content-type')?.includes('application/json') ? await res.json() : null;
       if (!res.ok) {
-        // rollback: notify parent to re-fetch or provide rollback mechanism
         setError(json?.error ?? 'Transfer failed');
-        // Optionally call onSuccess with negative amount to rollback (not implemented here)
       } else {
         // server returned new transactions or confirmation
-        onSuccess?.({
-          fromId: from,
-          toId: to,
-          amount: n,
-          newTransactions: json.newTransactions ?? [],
-        });
+        if (!Array.isArray(json?.accounts) || !Array.isArray(json?.transactions)) throw new Error('Invalid transfer response');
+        onSuccess?.({ accounts: json.accounts, transactions: json.transactions });
+        pendingRef.current = false;
         close();
       }
-    } catch (err) {
+    } catch {
       setError('Network error performing transfer');
     } finally {
+      pendingRef.current = false;
       setLoading(false);
     }
   }
@@ -130,7 +135,8 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
         type="button"
         ref={triggerRef}
         onClick={openModal}
-        className="px-3 py-2 bg-sky-600 text-white rounded shadow hover:bg-sky-700"
+        className="primary-button"
+        disabled={accounts.filter(account => !account.status || account.status === 'active').length < 2}
         aria-haspopup="dialog"
         aria-expanded={open}
       >
@@ -152,7 +158,7 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
 
           <div
             ref={modalRef}
-            className="relative z-10 w-full max-w-md bg-white rounded-lg shadow-lg p-6"
+            className="relative z-10 w-full max-w-md max-h-[85dvh] overflow-y-auto bg-white rounded-2xl shadow-lg p-4 sm:p-6"
             onClick={e => e.stopPropagation()}
           >
             <h3 id="transfer-title" className="text-lg font-semibold mb-3">
@@ -161,12 +167,14 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
 
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium">From</label>
+                <label htmlFor={`${formId}-from`} className="block text-sm font-medium">From</label>
                 <select
-                  ref={firstInputRef as any}
+                  id={`${formId}-from`}
+                  ref={firstInputRef}
+                  disabled={loading}
                   value={from}
                   onChange={e => setFrom(e.target.value)}
-                  className="mt-1 block w-full rounded border p-2"
+                  className="field-input mt-1"
                 >
                   <option value="">Select account</option>
                   {accounts.map(a => (
@@ -178,11 +186,13 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
               </div>
 
               <div>
-                <label className="block text-sm font-medium">To</label>
+                <label htmlFor={`${formId}-to`} className="block text-sm font-medium">To</label>
                 <select
+                  id={`${formId}-to`}
+                  disabled={loading}
                   value={to}
                   onChange={e => setTo(e.target.value)}
-                  className="mt-1 block w-full rounded border p-2"
+                  className="field-input mt-1"
                 >
                   <option value="">Select account</option>
                   {accounts.map(a => (
@@ -194,17 +204,19 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
               </div>
 
               <div>
-                <label className="block text-sm font-medium">Amount</label>
+                <label htmlFor={`${formId}-amount`} className="block text-sm font-medium">Amount</label>
                 <input
+                  id={`${formId}-amount`}
+                  disabled={loading}
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
                   inputMode="decimal"
                   placeholder="0.00"
-                  className="mt-1 block w-full rounded border p-2"
+                  className="field-input mt-1"
                 />
               </div>
 
-              {error && <div className="text-sm text-red-600">{error}</div>}
+              {error && <div role="alert" className="text-sm text-red-600">{error}</div>}
             </div>
 
             <div className="mt-4 flex justify-end gap-2">
@@ -219,7 +231,7 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
               <button
                 type="button"
                 onClick={submit}
-                className="px-3 py-2 rounded bg-sky-600 text-white disabled:opacity-60"
+                className="primary-button"
                 disabled={loading}
               >
                 {loading ? 'Sending...' : 'Send'}

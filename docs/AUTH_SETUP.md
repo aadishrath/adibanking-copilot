@@ -1,0 +1,74 @@
+# Supabase login, roles, and profiles
+
+## What this chunk adds
+
+- `/login`: email/password sign-in using Supabase Auth.
+- Protected dashboard, accounts, transactions, and profile pages.
+- A top navbar with a placeholder person icon, Profile link, and Logout button.
+- `/profile`: editable full name, email, contact phone, city, and country.
+- `/admin/users`: a user directory shown only to administrators.
+- Server-side authorization on pages and existing APIs, cookie sessions, and token refresh through Next.js 16 `proxy.ts`.
+
+| Feature | Customer | Admin |
+| --- | --- | --- |
+| Dashboard, accounts, transactions | Yes | Yes |
+| Own profile editing | Yes | Yes |
+| AI assistant | Yes | Yes |
+| User directory | No | Yes |
+| Transfers | Unavailable until persistent transfer service is implemented | Same |
+
+## Configuration
+
+Copy `.env.example` to `.env.local` for a new checkout. The app accepts `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, or the existing `NEXT_PUBLIC_SUPABASE_KEY`. Supply a public key for user sessions, never a service-role/secret key. `SUPABASE_SERVICE_ROLE_KEY` stays on the server and is used only after the admin authorization check or by the seed script.
+
+Enable email/password authentication in the Supabase project. Set the Auth Site URL to the running app and allow `<app origin>/auth/callback` as a redirect URL. Keep `NEXT_PUBLIC_APP_URL` aligned with that origin. Email changes use Supabase confirmation, and the displayed sign-in email remains the verified email until confirmation completes. This confirmation flow requires real inboxes; the seeded `.example` addresses cannot receive mail.
+
+```powershell
+npm ci
+npm run seed:users
+npm run dev
+```
+
+## Demo accounts
+
+The seed script creates and confirms three accounts, without sending email:
+
+- `admin@adibank.example` — Administrator, AdiBank Admin.
+- `maya@adibank.example` — Customer, Maya Patel.
+- `alex@adibank.example` — Customer, Alex Morgan.
+
+It generates a different random password for each and writes credentials to `.env.demo-users.json`, which Git ignores. Read that local file to sign in. The script preserves existing users and passwords on subsequent runs. It requires a server service-role key and should run only against the intended demo project. Do not publish the credential file.
+
+Roles live in Supabase `app_metadata.role`, which ordinary users cannot edit. Profile information lives in `user_metadata`. Profile actions select allowed fields explicitly and do not accept role updates. A verified user without an admin role receives customer access.
+
+## Session behavior
+
+The server verifies users with `auth.getUser()` before granting access. Proxy refreshes expiring tokens and carries refreshed cookies and private cache headers to the response. Session cookies are HTTP-only and use secure transport in production. No access token is exposed to client components.
+
+Logout revokes the current Supabase session, removes its cookies, clears legacy browser chat/mock state, and redirects to `/login`. A failed logout displays an error so the UI does not imply that a still-active session has ended. Other devices remain signed in.
+
+## Verification
+
+```powershell
+npm run lint
+npm run type-check
+npm run build
+# With the development server running on port 3100:
+npm run verify:auth
+```
+
+Use `AUTH_TEST_URL` to verify a server on a different port. The auth verification script reads the private demo credentials and checks signed-out redirects/API rejection, customer restrictions, admin access, and honest transfer failure. It creates temporary login sessions and signs them out afterward.
+
+Browser checks also verified all three logins, invalid-password feedback and retry, menu navigation, profile persistence after refresh, and logout. Email delivery/confirmation was not exercised.
+
+The local network required Node to trust the Windows certificate store via a temporary exported public CA bundle (`NODE_EXTRA_CA_CERTS`). TLS verification remained enabled. If npm or Supabase requests fail certificate checks in this environment, configure the trusted CA bundle for the Node process rather than disabling verification.
+
+## Banking scope
+
+Financial pages still show the shared public demo fixtures. This chunk authenticates users and stores their profile information; it does not create real, user-owned financial records. The next data chunk will introduce account/transaction tables and row-level security. Transfer endpoints now return 501 instead of pretending to move money, and the modal leaves balances unchanged when requests fail.
+# Visible demo sign-in selector
+
+The login form shows a highlighted **Try a demo account** dropdown above the email field when `DEMO_LOGIN_ENABLED=true`. Choosing an account displays its email/password and fills the form; the visitor still clicks **Sign in**. The form appears before the welcome text on mobile.
+
+Locally, credentials come from the ignored `.env.demo-users.json` generated by `seed:users`. For hosting, set server-only `DEMO_LOGIN_ACCOUNTS` to a JSON array containing `email`, `password`, and `role` for the seeded demo users. Only `admin@adibank.example` (admin), `maya@adibank.example` (customer), and `alex@adibank.example` (customer) are accepted. Keep the passwords synchronized with Supabase Auth. This feature intentionally publishes those sandbox credentials; keep it disabled on projects containing private banking data. The default in `.env.example` is disabled.
+
