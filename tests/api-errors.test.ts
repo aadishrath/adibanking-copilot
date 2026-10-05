@@ -11,6 +11,10 @@ describe('API boundary', () => {
     await expect(readJson(request('x'.repeat(20_000)), schema)).rejects.toMatchObject({ status: 413 });
     await expect(readJson(request('{"amount":100}'), schema)).resolves.toEqual({ amount: 100 });
   });
+  test('rejects cross-origin JSON mutations',async()=>{
+    const cross=new Request('https://example.com/api',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://attacker.example'},body:'{"amount":100}'});
+    await expect(readJson(cross,schema)).rejects.toMatchObject({status:403});
+  });
   test('returns client-safe errors with request correlation', async () => {
     const response = apiFailure(new ApiError(503, 'Service unavailable'), 'test-request');
     expect(response.status).toBe(503);

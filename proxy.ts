@@ -5,7 +5,16 @@ import { getSupabaseConfig } from '@/lib/supabase/config';
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const config = getSupabaseConfig();
-  if (!config) return response;
+  const path = request.nextUrl.pathname;
+  const protectedPage = /^\/(?:profile|dashboard|accounts|transactions|transfers|admin)(?:\/|$)/.test(path);
+  const protectedApi = path.startsWith('/api/');
+  const deny = () => {
+    const denied = protectedApi ? NextResponse.json({ error: 'Sign in to access this resource.' }, { status: 401 }) : NextResponse.redirect(new URL('/login', request.url));
+    response.cookies.getAll().forEach(cookie => denied.cookies.set(cookie));
+    denied.headers.set('Cache-Control', 'private, no-store');
+    return denied;
+  };
+  if (!config) { response.headers.set('Cache-Control', 'private, no-store'); return protectedPage || protectedApi ? deny() : response; }
   const supabase = createServerClient(config.url, config.key, {
     cookieOptions: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/' },
     cookies: {
@@ -18,8 +27,15 @@ export async function proxy(request: NextRequest) {
       },
     },
   });
-  await supabase.auth.getClaims();
+  const { data, error } = await supabase.auth.getUser();
+  if ((protectedPage || protectedApi) && (error || !data.user)) return deny();
+  if ((path === '/admin' || path.startsWith('/admin/')) && data.user?.app_metadata.role !== 'admin') {
+    const denied = NextResponse.redirect(new URL('/dashboard', request.url));
+    response.cookies.getAll().forEach(cookie => denied.cookies.set(cookie));
+    denied.headers.set('Cache-Control', 'private, no-store');
+    return denied;
+  }
   response.headers.set('Cache-Control', 'private, no-store');
   return response;
 }
-export const config = { matcher: ['/', '/login', '/profile/:path*', '/dashboard/:path*', '/accounts/:path*', '/transactions/:path*', '/admin/:path*', '/auth/:path*', '/api/:path*'] };
+export const config = { matcher: ['/', '/login', '/profile/:path*', '/dashboard/:path*', '/accounts/:path*', '/transactions/:path*', '/transfers/:path*', '/admin/:path*', '/auth/:path*', '/api/:path*'] };

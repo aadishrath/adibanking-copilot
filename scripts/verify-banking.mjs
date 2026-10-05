@@ -7,7 +7,7 @@ import { createServerClient } from '@supabase/ssr';
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publicKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_KEY;
 const schemaColumns = {
-  accounts: 'id,user_id,name,account_type,currency,balance_cents,status,created_at',
+  accounts: 'id,user_id,name,account_type,credit_limit_cents,currency,balance_cents,status,created_at',
   transactions: 'id,user_id,account_id,transfer_id,amount_cents,currency,description,category,created_at',
   transfers: 'id,user_id,from_account_id,to_account_id,amount_cents,currency,idempotency_key,created_at',
 };
@@ -62,6 +62,8 @@ async function main() {
         assert.ok(!error, `${table}: authenticated read failed.`);
         assert.ok(data.every(row => row.user_id === session.id), `${table}: another user's data is visible.`);
         if (table === 'accounts') {
+          assert.ok(['checking','savings','retirement','investment','mortgage','loan','credit_card'].every(type=>data.some(row=>row.account_type===type)), 'Seed all seven demo account types.');
+          assert.ok(data.filter(row=>row.account_type==='credit_card').every(row=>row.credit_limit_cents>=row.balance_cents), 'Card debt must fit its limit.');
           assert.ok(data.length >= 2, 'Seed the customer checking/savings accounts first.');
           assert.ok(data.every(row => Number.isSafeInteger(row.balance_cents) && row.balance_cents >= 0), 'Balances must be nonnegative safe integer cents.');
           accountSets.push(data);

@@ -108,6 +108,9 @@ npm run seed:users
 npm run db:migrate
 npm run db:migrate -- --migration=202610040002_crud.sql
 npm run db:migrate -- --migration=202610040003_analytics.sql --activity --analytics-activity
+npm run db:migrate -- --migration=202610050001_account_types.sql --credit-activity
+npm run db:migrate -- --migration=202610050002_credit_transfers.sql
+npm run db:migrate -- --migration=202610050003_session_security.sql
 ```
 
 The scripts create three confirmed Supabase identities, seed checking/savings accounts and sample activity, and install transfer, CRUD, and analytics functions. Generated passwords go into ignored `.env.demo-users.json`. After setup, set `BANKING_DATA_SOURCE=supabase` and optionally `DEMO_LOGIN_ENABLED=true`.
@@ -179,3 +182,13 @@ Read [implementation progress](IMPLEMENTATION_PROGRESS.md), [banking operations]
 ---
 
 © 2026 aadish. Built by aadish. For demonstration purposes only. This notice identifies the author and demo purpose; it does not establish an open-source license.
+
+### Additional demo accounts
+
+Each demo user has Checking, Savings, Retirement, Investment, Mortgage, Loan, and Credit Card accounts. Mortgage, Loan, and Credit Card balances represent amounts owed. Mortgage and Loan accounts cannot fund transfers; a payment from an asset account reduces both its funds and the destination debt. Card charges increase debt and are limited by available credit. The card demo includes four purchases, a $100 checking payment, a $5,000 limit and $135.99 outstanding. Purchases can be edited/deleted in Transactions, and payments edited/reversed in Transfers. Opening balances and payment ledger entries are protected. Retirement/investment balances are simulated cash, without trading; loans/cards do not accrue interest or implement statement cycles.
+
+New demo users receive eight-character passwords. To explicitly reset the three existing demo users only, run `npm run seed:users -- --reset-demo-passwords`. Credentials are stored in the ignored `.env.demo-users.json`; the enabled login demo dropdown reads this file. Update `DEMO_LOGIN_ACCOUNTS` separately if your deployment uses that environment override.
+
+Credit cards can fund sandbox cash advances up to available credit (limit minus amount owed), even when the transfer exceeds the current card balance. Advances increase card debt and credit the destination; edits/reversals adjust both balances atomically. Matching currencies and account ownership are required. Mortgage/Loan accounts accept payments only. No cash-advance fees, interest, retirement withdrawal penalties, or real-world account restrictions are simulated.
+
+Banking endpoints validate identity and active Supabase session state. Database RLS and mutation functions also require an active session, blocking saved access tokens after logout. Private demo fixtures live in `lib/fixtures`; former `/mock-data/*.json` URLs are unavailable. API bodies never include credentials or banking data on authentication failure. Public demo login credentials remain intentionally public when demo login is enabled.

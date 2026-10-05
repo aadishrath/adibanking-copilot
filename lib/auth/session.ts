@@ -9,7 +9,12 @@ export const getCurrentUser = cache(async () => {
   if (!getSupabaseConfig()) return null;
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
-  return error ? null : data.user;
+  if (error || !data.user) return null;
+  if (process.env.BANKING_DATA_SOURCE === 'supabase') {
+    const session = await supabase.rpc('has_active_banking_session');
+    if (session.error || session.data !== true) return null;
+  }
+  return data.user;
 });
 export async function getViewer(): Promise<Viewer | null> {
   const user = await getCurrentUser();

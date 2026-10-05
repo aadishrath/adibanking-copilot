@@ -1,0 +1,45 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { PGlite } from '@electric-sql/pglite';
+test('credit card seed, RLS, limits, charges and payment reversals',async()=>{
+ const db=new PGlite();
+ try {
+ await db.exec(`create schema auth; create table auth.users(id uuid primary key,email text); create role authenticated; create role anon; create role service_role bypassrls; create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon; insert into auth.users values ('00000000-0000-0000-0000-000000000001','maya@adibank.example'),('00000000-0000-0000-0000-000000000002','alex@adibank.example');`);
+ for(const file of ['migrations/202610040001_banking.sql','migrations/202610040002_crud.sql','migrations/202610050001_account_types.sql','migrations/202610050002_credit_transfers.sql','seed.sql','demo-credit-activity.sql','demo-credit-activity.sql']) await db.exec(await readFile(new URL('../supabase/'+file,import.meta.url),'utf8'));
+ await db.exec(`select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false); set role authenticated;`);
+ const accounts=(await db.query('select * from accounts')).rows;
+ assert.equal(accounts.length,7);
+ const card=accounts.find(a=>a.account_type==='credit_card'),cash=accounts.find(a=>a.account_type==='checking');
+ const balance=async id=>Number((await db.query('select balance_cents from accounts where id=$1',[id])).rows[0].balance_cents);
+ assert.equal(await balance(card.id),13599);
+ assert.equal(Number(card.credit_limit_cents),500000);
+ const mutate=(kind,op,id,values,key=randomUUID())=>db.query('select manage_banking_record($1,$2,$3,$4,$5)',[kind,op,id,values,key]);
+ const charge=randomUUID(); await mutate('transactions','create',charge,{account_id:card.id,amount_cents:-1000,description:'Card test',category:'shopping'});
+ assert.equal(await balance(card.id),14599);
+ await mutate('transactions','update',charge,{amount_cents:-2000,description:'Card test',category:'shopping'}); assert.equal(await balance(card.id),15599);
+ await mutate('transactions','delete',charge,{}); assert.equal(await balance(card.id),13599);
+ await assert.rejects(mutate('transactions','create',randomUUID(),{account_id:card.id,amount_cents:-500000,description:'Over limit',category:'shopping'})); assert.equal(await balance(card.id),13599);
+ await assert.rejects(mutate('transactions','create',randomUUID(),{account_id:card.id,amount_cents:100,description:'Incorrect manual payment',category:'income'}));
+ const transfer=(from,to,amount,key)=>db.query('select (transfer_funds($1,$2,$3,$4)).*',[from,to,amount,key]);
+ await assert.rejects(transfer(accounts.find(a=>a.account_type==='loan').id,cash.id,1,randomUUID()));
+ await assert.rejects(transfer(cash.id,card.id,13600,randomUUID()));
+ const before=await balance(cash.id),key=randomUUID(); const paid=(await transfer(cash.id,card.id,1000,key)).rows[0]; await transfer(cash.id,card.id,1000,key);
+ assert.equal(await balance(card.id),12599); assert.equal(await balance(cash.id),before-1000);
+ await mutate('transfers','update',paid.id,{amount_cents:2000}); assert.equal(await balance(card.id),11599);
+ await mutate('transfers','delete',paid.id,{}); assert.equal(await balance(card.id),13599); assert.equal(await balance(cash.id),before);
+ const advanceKey=randomUUID(),advance=(await transfer(card.id,cash.id,20000,advanceKey)).rows[0];
+ await transfer(card.id,cash.id,20000,advanceKey);
+ assert.equal(await balance(card.id),33599); assert.equal(await balance(cash.id),before+20000);
+ await assert.rejects(transfer(card.id,cash.id,466402,randomUUID()));
+ await mutate('transfers','update',advance.id,{amount_cents:30000}); assert.equal(await balance(card.id),43599); assert.equal(await balance(cash.id),before+30000);
+ await assert.rejects(mutate('transfers','update',advance.id,{amount_cents:500000})); assert.equal(await balance(card.id),43599);
+ await mutate('transfers','delete',advance.id,{}); assert.equal(await balance(card.id),13599); assert.equal(await balance(cash.id),before);
+ const max=(await transfer(card.id,cash.id,486401,randomUUID())).rows[0]; assert.equal(await balance(card.id),500000);
+ await assert.rejects(transfer(card.id,cash.id,1,randomUUID())); await mutate('transfers','delete',max.id,{});
+ await assert.rejects(db.query('update accounts set balance_cents=0'));
+ const totals=(await db.query('select a.id,a.balance_cents,a.account_type,sum(t.amount_cents)::bigint total from accounts a join transactions t on t.account_id=a.id group by a.id')).rows;
+ for(const a of totals) assert.equal(Number(a.balance_cents),Number(a.total)*(['mortgage','loan','credit_card'].includes(a.account_type)?-1:1));
+ } finally {await db.close();}
+});

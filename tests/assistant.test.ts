@@ -36,6 +36,17 @@ describe('banking assistant scope and transfer planning',()=>{
     expect(()=>resolveAccount('checking',[...accounts,{...accounts[0],id:other,name:'Second Checking'}])).toThrow('ambiguous');
     expect(resolveAccount('My Checking',[...accounts,{...accounts[0],id:other,name:'Second Checking'}]).id).toBe(from);
   });
+  test('resolves credit card payments and rejects debt funding and overpayment',()=>{
+    const card: Account={id:other,name:'Demo Visa',accountType:'credit_card',status:'active',currency:'USD',balance:40,balanceCents:4000,creditLimitCents:500000};
+    const all=[...accounts,card];
+    expect(resolveAccount('credit card',all).id).toBe(other);
+    const command={kind:'transfer' as const,from:'checking',to:'credit card',amount:'25'};
+    expect(prepareTransfer(command,all).amountCents).toBe(2500);
+    expect(()=>prepareTransfer({...command,amount:'40.01'},all)).toThrow('amount owed');
+    expect(prepareTransfer({...command,from:'credit card',to:'checking',amount:'100'},all).amountCents).toBe(10000);
+    expect(()=>prepareTransfer({...command,from:'credit card',to:'checking',amount:'4960.01'},all)).toThrow('available credit');
+    expect(()=>prepareTransfer({...command,from:'Demo Visa',to:'checking'},[...accounts,{...card,accountType:'loan'}])).toThrow('cannot fund');
+  });
   test('supports owned reads and app navigation help only',()=>{
     expect(parseAssistantCommand('show my accounts').kind).toBe('accounts');
     expect(parseAssistantCommand('show my recent transactions').kind).toBe('transactions');

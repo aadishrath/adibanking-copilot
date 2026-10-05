@@ -5,6 +5,8 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 export async function readJson<T>(request: Request, schema: ZodType<T>): Promise<T> {
+  const origin = request.headers.get('origin');
+  if (request.headers.get('sec-fetch-site') === 'cross-site' || (origin && origin !== new URL(request.url).origin)) throw new ApiError(403, 'Requests must originate from this application.');
   if (!request.headers.get('content-type')?.includes('application/json')) throw new ApiError(415, 'Send JSON with Content-Type: application/json.');
   const reader = request.body?.getReader();
   if (!reader) throw new ApiError(400, 'A JSON body is required.');

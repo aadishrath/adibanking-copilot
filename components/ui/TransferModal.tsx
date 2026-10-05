@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useId, useRef, useState } from 'react';
+import { isDebtAccount, canFundTransfer, transferableCents } from '@/types/account';
 import type { Account } from '@/types/account';
 import type { Transaction } from '@/types/transaction';
 import { parseAmountCents } from '@/lib/money';
@@ -9,14 +10,16 @@ interface TransferModalProps {
   onSuccess?: (result: { accounts: Account[]; transactions: Transaction[] }) => void;
   defaultFrom?: string;
   defaultTo?: string;
+  triggerLabel?: string;
 };
 
 
-export default function TransferModal({ accounts, onSuccess, defaultFrom, defaultTo }: TransferModalProps) {
+export default function TransferModal({ accounts, onSuccess, defaultFrom, defaultTo, triggerLabel = 'Transfer' }: TransferModalProps) {
+  const sourceAccounts = accounts.filter(a => canFundTransfer(a.accountType) && (!a.status || a.status === 'active'));
   const formId = useId();
   const [open, setOpen] = useState(false);
-  const [from, setFrom] = useState<string>(defaultFrom ?? accounts?.[0]?.id ?? '');
-  const [to, setTo] = useState<string>(defaultTo ?? accounts?.[1]?.id ?? accounts?.[0]?.id ?? '');
+  const [from, setFrom] = useState<string>(defaultFrom ?? sourceAccounts[0]?.id ?? '');
+  const [to, setTo] = useState<string>(defaultTo ?? accounts?.[1]?.id ?? sourceAccounts[0]?.id ?? '');
   const [amount, setAmount] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,7 +65,7 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
     requestKey.current = crypto.randomUUID();
     // Initialize from the latest accounts when opening, without resetting edits
     // whenever the parent refreshes its account array.
-    setFrom(defaultFrom ?? accounts[0]?.id ?? '');
+    setFrom(defaultFrom ?? sourceAccounts[0]?.id ?? '');
     setTo(defaultTo ?? accounts[1]?.id ?? accounts[0]?.id ?? '');
     setError(null);
     setOpen(true);
@@ -86,7 +89,9 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
     if (!fromAcc) return { ok: false, message: 'Source account not found.' };
     const toAcc = accounts.find(a => a.id === to);
     if (!toAcc || toAcc.currency !== fromAcc.currency) return { ok: false, message: 'Select accounts with matching currencies.' };
-    if (cents > (fromAcc.balanceCents ?? Math.round(fromAcc.balance * 100))) return { ok: false, message: 'Insufficient funds in source account.' };
+    if (!canFundTransfer(fromAcc.accountType)) return { ok: false, message: 'Mortgage and Loan accounts cannot fund transfers.' };
+    if (isDebtAccount(toAcc.accountType) && cents > (toAcc.balanceCents ?? 0)) return { ok: false, message: 'Payment cannot exceed the amount owed.' };
+    if (cents > transferableCents(fromAcc)) return { ok: false, message: fromAcc.accountType === 'credit_card' ? 'Amount exceeds available credit.' : 'Insufficient funds in source account.' };
     return { ok: true };
   }
 
@@ -136,11 +141,11 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
         ref={triggerRef}
         onClick={openModal}
         className="primary-button"
-        disabled={accounts.filter(account => !account.status || account.status === 'active').length < 2}
+        disabled={!sourceAccounts.length || accounts.filter(account => !account.status || account.status === 'active').length < 2}
         aria-haspopup="dialog"
         aria-expanded={open}
       >
-        Transfer
+        {triggerLabel}
       </button>
 
       {open && (
@@ -166,6 +171,7 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
             </h3>
 
             <div className="space-y-3">
+              {accounts.find(a => a.id === from)?.accountType === 'credit_card' && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">This is a sandbox cash advance. It increases card debt and reduces available credit. No interest or fees are simulated.</p>}
               <div>
                 <label htmlFor={`${formId}-from`} className="block text-sm font-medium">From</label>
                 <select
@@ -177,9 +183,9 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
                   className="field-input mt-1"
                 >
                   <option value="">Select account</option>
-                  {accounts.map(a => (
+                  {sourceAccounts.map(a => (
                     <option key={a.id} value={a.id}>
-                      {a.name} — {a.currency} {Number(a.balance).toLocaleString()}
+                      {a.name} — {a.accountType === 'credit_card' ? 'available credit ' : ''}{a.currency} {(transferableCents(a) / 100).toLocaleString()}
                     </option>
                   ))}
                 </select>
@@ -197,7 +203,7 @@ export default function TransferModal({ accounts, onSuccess, defaultFrom, defaul
                   <option value="">Select account</option>
                   {accounts.map(a => (
                     <option key={a.id} value={a.id}>
-                      {a.name} — {a.currency} {Number(a.balance).toLocaleString()}
+                      {a.name} — {isDebtAccount(a.accountType) ? 'owed ' : ''}{a.currency} {Number(a.balance).toLocaleString()}
                     </option>
                   ))}
                 </select>

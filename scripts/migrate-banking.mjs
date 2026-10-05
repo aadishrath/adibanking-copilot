@@ -40,6 +40,7 @@ async function main() {
     await client.query(await readFile(new URL('../supabase/seed.sql', import.meta.url), 'utf8'));
     if (process.argv.includes('--activity')) await client.query(await readFile(new URL('../supabase/demo-activity.sql', import.meta.url), 'utf8'));
     if (process.argv.includes('--analytics-activity')) await client.query(await readFile(new URL('../supabase/demo-analytics-activity.sql', import.meta.url), 'utf8'));
+    if (process.argv.includes('--credit-activity')) await client.query(await readFile(new URL('../supabase/demo-credit-activity.sql', import.meta.url), 'utf8'));
     await client.query("notify pgrst, 'reload schema'");
     console.log('Demo banking seed committed. Run verify:banking before changing the data mode.');
   } catch (error) {

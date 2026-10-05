@@ -45,7 +45,7 @@ describe('assistant API boundaries and availability',()=>{
     const outage=await chat(body({prompt:'show my accounts'}));expect(outage.status).toBe(503);expect((await outage.json()).error).toContain('Banking data is unavailable');
   });
   test('preparing a proposal never executes a transfer',async()=>{
-    jest.mocked(getBankingSnapshot).mockResolvedValue({source:'supabase',accounts:[{id:fromId,name:'Checking',currency:'USD',balance:100,balanceCents:10000,createdAt:new Date().toISOString(),accountType:'checking',status:'active'},{id:toId,name:'Savings',currency:'USD',balance:0,balanceCents:0,createdAt:new Date().toISOString(),accountType:'savings',status:'active'}],transactions:[],transfers:[]});
+    jest.mocked(getBankingSnapshot).mockResolvedValue({source:'supabase',accounts:[{id:fromId,name:'Checking',creditLimitCents:null,currency:'USD',balance:100,balanceCents:10000,createdAt:new Date().toISOString(),accountType:'checking',status:'active'},{id:toId,name:'Savings',creditLimitCents:null,currency:'USD',balance:0,balanceCents:0,createdAt:new Date().toISOString(),accountType:'savings',status:'active'}],transactions:[],transfers:[]});
     const response=await chat(body({prompt:'transfer 0.29 from checking to savings'}));expect(response.status).toBe(200);
     const data=await response.json();expect(data.proposal.amountCents).toBe(29);expect(data.proposal.token).toBeTruthy();expect(executeTransfer).not.toHaveBeenCalled();
     delete process.env.CHAT_TRANSFER_SIGNING_SECRET;

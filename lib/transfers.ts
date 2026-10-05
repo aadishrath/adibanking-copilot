@@ -9,7 +9,7 @@ export async function executeTransfer(userId: string, body: { fromId: string; to
   const { data, error } = await supabase.rpc('transfer_funds', { p_from: body.fromId, p_to: body.toId, p_amount_cents: body.amountCents, p_idempotency_key: body.idempotencyKey });
   if (error) {
     if (error.code === '42501') throw new ApiError(403, 'One of the accounts is unavailable in your workspace.');
-    if (error.code === '22023') throw new ApiError(400, 'Check your account status, currencies, available funds, and transfer details.');
+    if (error.code === '22023') throw new ApiError(400, 'Check your account status, currencies, available funds or credit, amount owed, and transfer details. Mortgage and Loan accounts cannot fund transfers.');
     throw new ApiError(503, 'The banking backend could not confirm this transfer. Retry the same confirmation to check its status.');
   }
   const receipt = Array.isArray(data) ? data[0] : data;

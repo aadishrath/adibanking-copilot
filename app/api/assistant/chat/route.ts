@@ -1,3 +1,4 @@
+import { isDebtAccount } from '@/types/account';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getViewer } from '@/lib/auth/session';
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
       return reply(`${data.month} (${currency}, ${timezone})\nIncome: ${money(current.incomeCents,currency)}\nExpenses: ${money(current.expenseCents,currency)}\nNet savings: ${money(current.savingsCents,currency)}\nOpening balances and internal transfers are excluded.`);
     }
     const snapshot = await getBankingSnapshot(viewer.id);
-    if (command.kind === 'accounts') return reply(snapshot.accounts.length ? `Your accounts:\n${snapshot.accounts.slice(0,25).map(account => `${account.name} (${account.status}, ${account.currency}): ${money(account.balanceCents ?? 0,account.currency)}`).join('\n')}${snapshot.accounts.length > 25 ? '\nShowing the first 25. Open Accounts for the full list.' : ''}` : 'You have no accounts yet. Create a sandbox account in Accounts.');
+    if (command.kind === 'accounts') return reply(snapshot.accounts.length ? `Your accounts:\n${snapshot.accounts.slice(0,25).map(account => `${account.name} (${account.status}, ${account.currency}): ${isDebtAccount(account.accountType) ? 'Amount owed ' : ''}${money(account.balanceCents ?? 0,account.currency)}`).join('\n')}${snapshot.accounts.length > 25 ? '\nShowing the first 25. Open Accounts for the full list.' : ''}` : 'You have no accounts yet. Create a sandbox account in Accounts.');
     if (command.kind === 'transactions') {
       try { new Intl.DateTimeFormat('en-US',{timeZone:timezone}); }
       catch { throw new ApiError(400,'Choose a valid time zone for transaction dates.'); }
@@ -53,14 +54,14 @@ export async function POST(request: Request) {
     try {
       if (command.kind === 'balance') {
         const account = resolveAccount(command.account,snapshot.accounts);
-        return reply(`${account.name}: ${money(account.balanceCents ?? 0,account.currency)} (${account.status}).`);
+        return reply(`${account.name}: ${isDebtAccount(account.accountType) ? 'Amount owed ' : ''}${money(account.balanceCents ?? 0,account.currency)} (${account.status}).`);
       }
       if (command.kind !== 'transfer') return reply(REFUSAL);
       const plan = prepareTransfer(command,snapshot.accounts);
       const secret = process.env.CHAT_TRANSFER_SIGNING_SECRET ?? '';
       if (secret.length < 32) throw new ApiError(503, 'Chat transfer confirmation is not configured on the server. You can still use the Transfers page.');
       const signed = issueTransferToken({ userId:viewer.id,fromId:plan.from.id,toId:plan.to.id,amountCents:plan.amountCents,currency:plan.currency },secret);
-      return reply('Review this sandbox transfer below. No funds move until you press Confirm transfer.', { token:signed.token,fromName:plan.from.name,toName:plan.to.name,fromId:plan.from.id,toId:plan.to.id,amountCents:plan.amountCents,currency:plan.currency,expiresAt:signed.payload.expiresAt });
+      return reply(plan.from.accountType === 'credit_card' ? 'Review this sandbox cash advance below. It increases card debt and reduces available credit. No interest or fees are simulated. No funds move until you press Confirm transfer.' : 'Review this sandbox transfer below. No funds move until you press Confirm transfer.', { token:signed.token,fromName:plan.from.name,toName:plan.to.name,fromId:plan.from.id,toId:plan.to.id,amountCents:plan.amountCents,currency:plan.currency,expiresAt:signed.payload.expiresAt });
     } catch (error) {
       if (error instanceof ApiError) throw error;
       return reply(error instanceof Error ? error.message : 'The transfer details could not be prepared.');

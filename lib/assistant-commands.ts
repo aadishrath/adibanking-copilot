@@ -1,4 +1,5 @@
 import { parseAmountCents } from '@/lib/money';
+import { isDebtAccount, canFundTransfer, transferableCents } from '@/types/account';
 import type { Account } from '@/types/account';
 
 export const REFUSAL = 'Cannot process this request. I can only help with AdiBank accounts, transactions, analytics, profiles, and transfers.';
@@ -44,7 +45,7 @@ export function resolveAccount(label: string, accounts: Account[]): Account {
   const normalize = (value: string) => value.trim().replace(/^["']|["']$/g, '').toLowerCase();
   const key = normalize(label), short = key.replace(/ account$/, '').replace(/^(?:my|the) /, '');
   const exact = accounts.filter(account => normalize(account.name) === key || account.id.toLowerCase() === key);
-  const matches = exact.length ? exact : accounts.filter(account => normalize(account.name) === short || account.accountType === short);
+  const matches = exact.length ? exact : accounts.filter(account => normalize(account.name) === short || account.accountType === short.replaceAll(' ', '_'));
   if (matches.length !== 1) throw Error(matches.length ? 'That account name is ambiguous. Use the exact account name or ID from Accounts.' : 'That account is not available in your AdiBank workspace. Use “show my accounts” to check its name.');
   return matches[0];
 }
@@ -55,6 +56,8 @@ export function prepareTransfer(command: Extract<AssistantCommand, { kind: 'tran
   if (from.id === to.id) throw Error('Choose two different accounts for the transfer.');
   if (from.status !== 'active' || to.status !== 'active') throw Error('Both accounts must be active. Check their status in Accounts.');
   if (from.currency !== to.currency || (command.currency && command.currency !== from.currency)) throw Error('Both accounts and the requested amount must use the same currency. Currency conversion is unavailable.');
-  if (amountCents > (from.balanceCents ?? 0)) throw Error('The source account does not have enough available sandbox funds.');
+  if (!canFundTransfer(from.accountType)) throw Error('Mortgage and Loan accounts cannot fund transfers.');
+  if (isDebtAccount(to.accountType) && amountCents > (to.balanceCents ?? 0)) throw Error('Payment cannot exceed the amount owed.');
+  if (amountCents > transferableCents(from)) throw Error(from.accountType === 'credit_card' ? 'The credit card does not have enough available credit.' : 'The source account does not have enough available sandbox funds.');
   return { from, to, amountCents, currency: from.currency };
 }

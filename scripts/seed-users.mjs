@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { randomBytes } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
@@ -18,16 +17,26 @@ for (let page = 1; ; page++) {
   if (data.users.length < 100) break;
 }
 const users = [
-  { email: 'admin@adibank.example', fullName: 'AdiBank Admin', role: 'admin' },
-  { email: 'maya@adibank.example', fullName: 'Maya Patel', role: 'customer' },
-  { email: 'alex@adibank.example', fullName: 'Alex Morgan', role: 'customer' },
+  { email: 'admin@adibank.example', fullName: 'AdiBank Admin', role: 'admin', password: 'Admin!12' },
+  { email: 'maya@adibank.example', fullName: 'Maya Patel', role: 'customer', password: 'Maya!123' },
+  { email: 'alex@adibank.example', fullName: 'Alex Morgan', role: 'customer', password: 'Alex!123' },
 ];
 for (const user of users) {
-  if (existing.some(item => item.email?.toLowerCase() === user.email)) {
+  const found = existing.find(item => item.email?.toLowerCase() === user.email);
+  if (found && process.argv.includes('--reset-demo-passwords')) {
+    const { error } = await client.auth.admin.updateUserById(found.id, { password: user.password });
+    if (error) throw new Error(`Unable to reset demo password (${error.code ?? error.status ?? 'connection failure'}).`);
+    credentials = credentials.filter(item => item.email !== user.email);
+    credentials.push({ id: found.id, email: user.email, password: user.password, role: found.app_metadata?.role ?? user.role });
+    await writeFile(credentialPath, `${JSON.stringify(credentials, null, 2)}\n`, { mode: 0o600 });
+    console.log(`Updated demo password: ${user.email}`);
+    continue;
+  }
+  if (found) {
     console.log(`Preserved existing account: ${user.email}`);
     continue;
   }
-  const password = `Adi!${randomBytes(18).toString('base64url')}9a`;
+  const password = user.password;
   const { data, error } = await client.auth.admin.createUser({ email: user.email, password, email_confirm: true, app_metadata: { role: user.role }, user_metadata: { full_name: user.fullName, contact_phone: '', city: '', country: '' } });
   if (error) throw new Error(`Unable to create ${user.email} (${error.code ?? error.status ?? 'connection failure'}).`);
   credentials.push({ id: data.user.id, email: user.email, password, role: user.role });
