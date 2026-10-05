@@ -1,74 +1,50 @@
-# Supabase login, roles, and profiles
+# Authentication, demo users, and roles
 
-## What this chunk adds
+Updated October 5, 2026. Use a dedicated Supabase sandbox with email/password authentication. [Live demo](https://adibanking-copilot.vercel.app/) · [Local setup](../README.md#run-locally) · [Security audit](SECURITY.md).
 
-- `/login`: email/password sign-in using Supabase Auth.
-- Protected dashboard, accounts, transactions, and profile pages.
-- A top navbar with a placeholder person icon, Profile link, and Logout button.
-- `/profile`: editable full name, email, contact phone, city, and country.
-- `/admin/users`: a user directory shown only to administrators.
-- Server-side authorization on pages and existing APIs, cookie sessions, and token refresh through Next.js 16 `proxy.ts`.
+## Differences between users
 
-| Feature | Customer | Admin |
+| User | Role | Available features |
 | --- | --- | --- |
-| Dashboard, accounts, transactions | Yes | Yes |
-| Own profile editing | Yes | Yes |
-| AI assistant | Yes | Yes |
-| User directory | No | Yes |
-| Transfers | Unavailable until persistent transfer service is implemented | Same |
+| AdiBank Admin — admin@adibank.example | Administrator | Own banking workspace, analytics, transfers/cash advances, assistant, profile; additional Users link and read-only user directory |
+| Maya Patel — maya@adibank.example | Customer | Own banking workspace, analytics, transfers/cash advances, assistant, profile |
+| Alex Morgan — alex@adibank.example | Customer | Same features as Maya, with separately owned records |
 
-## Configuration
+Every seeded identity has seven account types. Equal-looking seed balances do not mean records are shared across identities. Banking RLS applies equally to administrators and customers. An admin can view names, emails, roles, and creation dates in the directory, but cannot edit roles or manage users from that screen. Customers navigating directly to /admin/users are redirected to /dashboard.
 
-Copy `.env.example` to `.env.local` for a new checkout. The app accepts `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, or the existing `NEXT_PUBLIC_SUPABASE_KEY`. Supply a public key for user sessions, never a service-role/secret key. `SUPABASE_SERVICE_ROLE_KEY` stays on the server and is used only after the admin authorization check or by the seed script.
+![Customer role and navigation](screenshots/customer-dashboard.jpg)
 
-Enable email/password authentication in the Supabase project. Set the Auth Site URL to the running app and allow `<app origin>/auth/callback` as a redirect URL. Keep `NEXT_PUBLIC_APP_URL` aligned with that origin. Email changes use Supabase confirmation, and the displayed sign-in email remains the verified email until confirmation completes. This confirmation flow requires real inboxes; the seeded `.example` addresses cannot receive mail.
+![Administrator role and user directory](screenshots/admin-user-directory.jpg)
 
-```powershell
-npm ci
-npm run seed:users
-npm run dev
-```
+Roles are derived from Supabase app_metadata.role, which ordinary profile edits cannot change. User metadata stores the allowed name/contact fields. Signup and automatic account provisioning remain unimplemented.
 
-## Demo accounts
+## Configuration and credentials
 
-The seed script creates and confirms three accounts, without sending email:
+Copy .env.example to .env.local. Set NEXT_PUBLIC_SUPABASE_URL and a public publishable/anon key; keep SUPABASE_SERVICE_ROLE_KEY private. Set NEXT_PUBLIC_APP_URL to the app origin and allow that origin's /auth/callback URL in Supabase Auth. For full banking, apply all six migrations in the order documented in the README and set BANKING_DATA_SOURCE=supabase.
 
-- `admin@adibank.example` — Administrator, AdiBank Admin.
-- `maya@adibank.example` — Customer, Maya Patel.
-- `alex@adibank.example` — Customer, Alex Morgan.
+npm run seed:users creates/auto-confirms only the three designated demo identities and writes eight-character demo passwords to ignored .env.demo-users.json. Repeat runs preserve existing users and passwords. Explicit rotation is:
 
-It generates a different random password for each and writes credentials to `.env.demo-users.json`, which Git ignores. Read that local file to sign in. The script preserves existing users and passwords on subsequent runs. It requires a server service-role key and should run only against the intended demo project. Do not publish the credential file.
+~~~sh
+npm run seed:users -- --reset-demo-passwords
+~~~
 
-Roles live in Supabase `app_metadata.role`, which ordinary users cannot edit. Profile information lives in `user_metadata`. Profile actions select allowed fields explicitly and do not accept role updates. A verified user without an admin role receives customer access.
+DEMO_LOGIN_ENABLED=true shows the highlighted selector. Local credentials are loaded server-side from the ignored file. For hosting, set DEMO_LOGIN_ACCOUNTS to the allowlisted email/password/role JSON array and synchronize it after rotating Supabase passwords. The selector intentionally publishes sandbox credentials; never enable it in a project containing private user data or commit service/database credentials.
 
-## Session behavior
+![Current demo selector](screenshots/login-demo-dropdown.jpg)
 
-The server verifies users with `auth.getUser()` before granting access. Proxy refreshes expiring tokens and carries refreshed cookies and private cache headers to the response. Session cookies are HTTP-only and use secure transport in production. No access token is exposed to client components.
+These .example addresses cannot receive confirmation email. Editing a profile's email requires Supabase confirmation using real inboxes; delivery has not been verified for the demo identities.
 
-Logout revokes the current Supabase session, removes its cookies, clears legacy browser chat/mock state, and redirects to `/login`. A failed logout displays an error so the UI does not imply that a still-active session has ended. Other devices remain signed in.
+## Sessions and logout
+
+The server verifies auth.getUser() and, in persistent banking mode, the active database session. Proxy refreshes cookies, rejects signed-out APIs, redirects protected pages, and guards admin paths. Authorization is also checked inside pages/actions/API handlers. Cookies are HTTP-only, SameSite=Lax, and Secure in production; responses containing user data use private/no-store caching.
+
+Logout revokes the current Supabase session, removes its cookies, clears that user's browser chat state, and returns to Login. Other devices remain signed in. Active-session RLS policies and write RPC checks reject saved JWTs from the revoked session, rather than waiting for access-token expiry. A failed logout displays an error. Previously authorized responses remain in DevTools history; a newly unauthorized API request returns 401 with an error only.
 
 ## Verification
 
-```powershell
-npm run lint
-npm run type-check
-npm run build
-# With the development server running on port 3100:
+~~~sh
 npm run verify:auth
-```
+npm run verify:security
+~~~
 
-Use `AUTH_TEST_URL` to verify a server on a different port. The auth verification script reads the private demo credentials and checks signed-out redirects/API rejection, customer restrictions, admin access, and honest transfer failure. It creates temporary login sessions and signs them out afterward.
-
-Browser checks also verified all three logins, invalid-password feedback and retry, menu navigation, profile persistence after refresh, and logout. Email delivery/confirmation was not exercised.
-
-The local network required Node to trust the Windows certificate store via a temporary exported public CA bundle (`NODE_EXTRA_CA_CERTS`). TLS verification remained enabled. If npm or Supabase requests fail certificate checks in this environment, configure the trusted CA bundle for the Node process rather than disabling verification.
-
-## Banking scope
-
-Financial pages still show the shared public demo fixtures. This chunk authenticates users and stores their profile information; it does not create real, user-owned financial records. The next data chunk will introduce account/transaction tables and row-level security. Transfer endpoints now return 501 instead of pretending to move money, and the modal leaves balances unchanged when requests fail.
-# Visible demo sign-in selector
-
-The login form shows a highlighted **Try a demo account** dropdown above the email field when `DEMO_LOGIN_ENABLED=true`. Choosing an account displays its email/password and fills the form; the visitor still clicks **Sign in**. The form appears before the welcome text on mobile.
-
-Locally, credentials come from the ignored `.env.demo-users.json` generated by `seed:users`. For hosting, set server-only `DEMO_LOGIN_ACCOUNTS` to a JSON array containing `email`, `password`, and `role` for the seeded demo users. Only `admin@adibank.example` (admin), `maya@adibank.example` (customer), and `alex@adibank.example` (customer) are accepted. Keep the passwords synchronized with Supabase Auth. This feature intentionally publishes those sandbox credentials; keep it disabled on projects containing private banking data. The default in `.env.example` is disabled.
-
+Run the configured app on port 3100, or use AUTH_TEST_URL / SECURITY_TEST_URL overrides. Checks cover customer/admin navigation, endpoint guards, active-session revocation, ownership, and mutation protection. Browser checks cover all three logins, profile/menu navigation, and logout. Email delivery and physical-device accessibility still need independent checks. Configure a trusted NODE_EXTRA_CA_CERTS bundle if the local network requires one; keep TLS verification enabled.

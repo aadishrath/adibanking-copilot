@@ -10,3 +10,15 @@ The minimum target is the iPhone 12 mini's 375 × 812 CSS-pixel portrait viewpor
 - Financial pages refresh after confirmed chat transfers. Uncertain transfers retain their retry confirmation through refresh.
 
 Browser viewport checks are recorded in the implementation progress. Browser emulation does not certify physical iOS Safari behavior; a real-device check of the keyboard, safe areas, VoiceOver, and touch scrolling is still useful before release.
+
+## Current captures — October 5, 2026
+
+Phone screenshots use a 375 × 812 CSS-pixel viewport. They include the current seven-account workspace, transfer buttons, analytics, and card-aware assistant confirmation. Browser emulation is not a physical iPhone/Safari certification.
+
+<img src="screenshots/mobile-login.jpg" alt="Phone login and demo selector" width="375">
+
+<img src="screenshots/mobile-accounts.jpg" alt="Phone account cards with transfer controls" width="375">
+
+<img src="screenshots/mobile-analytics.jpg" alt="Phone monthly analytics and expense chart" width="375">
+
+<img src="screenshots/mobile-chat-transfer.jpg" alt="Phone assistant cash-advance review" width="375">

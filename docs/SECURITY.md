@@ -36,3 +36,7 @@ Run npm run verify:security with a production build running on localhost:3100 (o
 Run npm run test:database for session expiration, revocation, malformed/mismatched IDs, write RPC retry protection, ownership and atomicity tests. npm test covers API validation, assistant scope and signed confirmations. Build, lint, and existing auth/banking/assistant smoke checks verify legitimate behavior still works.
 
 This documents the tested boundaries, not a guarantee against every possible vulnerability. Keep Supabase/Vercel configuration and dependencies maintained; do not place real customer information in this public demo.
+
+## Documentation and demo visibility
+
+The [role comparison](AUTH_SETUP.md) and [screenshot inventory](screenshots/README.md) show only the three seeded public sandbox identities. Customer and administrator financial data remain owner-scoped. The administrator directory is read-only; screenshots do not imply privileged access to other users’ banking records. Demo credentials shown on Login are intentionally public. The current documentation captures were refreshed on October 5, 2026; deploying the updated app is still required to remove the last observed live static-fixture copies.
