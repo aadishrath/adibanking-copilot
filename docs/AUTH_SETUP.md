@@ -6,8 +6,8 @@ Updated October 5, 2026. Use a dedicated Supabase sandbox with email/password au
 
 | User | Role | Available features |
 | --- | --- | --- |
-| AdiBank Admin — admin@adibank.example | Administrator | Own banking workspace, analytics, transfers/cash advances, assistant, profile; additional Users link and read-only user directory |
-| Maya Patel — maya@adibank.example | Customer | Own banking workspace, analytics, transfers/cash advances, assistant, profile |
+| AdiBank Admin — admin@adibank.example | Administrator | Own banking workspace, analytics, transfers/cash advances, assistant, profile; own logs; additional Users directory and all-user logs with a user filter |
+| Maya Patel — maya@adibank.example | Customer | Own banking workspace, analytics, transfers/cash advances, assistant, profile, own logs |
 | Alex Morgan — alex@adibank.example | Customer | Same features as Maya, with separately owned records |
 
 Every seeded identity has seven account types. Equal-looking seed balances do not mean records are shared across identities. Banking RLS applies equally to administrators and customers. An admin can view names, emails, roles, and creation dates in the directory, but cannot edit roles or manage users from that screen. Customers navigating directly to /admin/users are redirected to /dashboard.
@@ -20,7 +20,7 @@ Roles are derived from Supabase app_metadata.role, which ordinary profile edits 
 
 ## Configuration and credentials
 
-Copy .env.example to .env.local. Set NEXT_PUBLIC_SUPABASE_URL and a public publishable/anon key; keep SUPABASE_SERVICE_ROLE_KEY private. Set NEXT_PUBLIC_APP_URL to the app origin and allow that origin's /auth/callback URL in Supabase Auth. For full banking, apply all six migrations in the order documented in the README and set BANKING_DATA_SOURCE=supabase.
+Copy .env.example to .env.local. Set NEXT_PUBLIC_SUPABASE_URL and a public publishable/anon key; keep SUPABASE_SERVICE_ROLE_KEY private. Set NEXT_PUBLIC_APP_URL to the app origin and allow that origin's /auth/callback URL in Supabase Auth. For full banking, apply all eight migrations in the order documented in the README and set BANKING_DATA_SOURCE=supabase.
 
 npm run seed:users creates/auto-confirms only the three designated demo identities and writes eight-character demo passwords to ignored .env.demo-users.json. Repeat runs preserve existing users and passwords. Explicit rotation is:
 
@@ -38,7 +38,7 @@ These .example addresses cannot receive confirmation email. Editing a profile's 
 
 The server verifies auth.getUser() and, in persistent banking mode, the active database session. Proxy refreshes cookies, rejects signed-out APIs, redirects protected pages, and guards admin paths. Authorization is also checked inside pages/actions/API handlers. Cookies are HTTP-only, SameSite=Lax, and Secure in production; responses containing user data use private/no-store caching.
 
-Logout revokes the current Supabase session, removes its cookies, clears that user's browser chat state, and returns to Login. Other devices remain signed in. Active-session RLS policies and write RPC checks reject saved JWTs from the revoked session, rather than waiting for access-token expiry. A failed logout displays an error. Previously authorized responses remain in DevTools history; a newly unauthorized API request returns 401 with an error only.
+Logout revokes the current Supabase session, removes its cookies, then clears that user's browser chat state and replaces the browser document with Login. This discards the previous user's navbar, menu, assistant, and cached client tree. Other devices remain signed in. Active-session RLS policies and write RPC checks reject saved JWTs from the revoked session, rather than waiting for access-token expiry. A failed logout displays an error and preserves chat state for a retry. Previously authorized responses remain in DevTools history; a newly unauthorized API request returns 401 with an error only.
 
 ## Verification
 

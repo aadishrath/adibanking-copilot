@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Viewport } from 'next';
 import ChatbotWidget from '@/components/ui/ChatbotWidget';
 import Navbar from '@/components/layout/Navbar';
+import ActivityTracker from '@/components/layout/ActivityTracker';
 import { getViewer } from '@/lib/auth/session';
 import { canAccess } from '@/lib/auth/roles';
 
@@ -18,7 +19,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en">
       <body>
         <div className="min-h-screen flex flex-col">
-          <Navbar key={viewer?.id ?? 'guest'} viewer={viewer} />
+          <Navbar key={`navbar:${viewer?.id ?? 'guest'}`} viewer={viewer} />
+          {viewer && <ActivityTracker key={`activity:${viewer.id}`}/>}
 
           <main className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-6 sm:px-6">{children}</main>
 
@@ -27,7 +29,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           </footer>
         </div>
 
-        {viewer && canAccess(viewer.role, 'assistant') && <ChatbotWidget key={viewer.id} userId={viewer.id} />}
+        {viewer && canAccess(viewer.role, 'assistant') && <ChatbotWidget key={`assistant:${viewer.id}`} userId={viewer.id} />}
       </body>
     </html>
   );

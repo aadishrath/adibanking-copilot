@@ -1,3 +1,4 @@
+import { withActivity } from '@/lib/activity-api';
 import { isDebtAccount } from '@/types/account';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -14,7 +15,7 @@ export const runtime = 'nodejs';
 const ChatBody = z.object({ prompt: z.string().trim().min(1, 'Enter a message.').max(4000, 'Keep messages under 4000 characters.'), currency: z.enum(['USD','EUR','GBP']).default('USD'), timezone: z.string().min(1).max(100).default('America/Los_Angeles') }).strict();
 const limits = new Map<string, { count: number; resetAt: number }>();
 const money = (cents: number, currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const requestId = crypto.randomUUID();
   const reply = (assistant: string, proposal?: unknown) => NextResponse.json({ assistant, ...(proposal ? { proposal } : {}), requestId }, { headers: { 'Cache-Control': 'private, no-store', 'X-Request-Id': requestId } });
   try {
@@ -68,3 +69,5 @@ export async function POST(request: Request) {
     }
   } catch (error) { return apiFailure(error,requestId); }
 }
+
+export const POST = withActivity(handlePOST);

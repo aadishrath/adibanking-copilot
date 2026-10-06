@@ -1,6 +1,6 @@
 # Persistent banking database
 
-Updated October 5, 2026. The local app runs in BANKING_DATA_SOURCE=supabase mode with user-owned data. All six migrations below have been applied to the configured demo Supabase project. Do not rerun them there. The [README](../README.md#run-locally) provides the full fresh-project setup; [deployment](DEPLOYMENT.md) distinguishes hosted database state from deployed app files.
+Updated October 5, 2026. The local app runs in BANKING_DATA_SOURCE=supabase mode with user-owned data. All eight migrations below have been applied to the configured demo Supabase project. Do not rerun them there. The [README](../README.md#run-locally) provides the full fresh-project setup; [deployment](DEPLOYMENT.md) distinguishes hosted database state from deployed app files.
 
 ## Migration order for a new sandbox
 
@@ -12,10 +12,14 @@ Updated October 5, 2026. The local app runs in BANKING_DATA_SOURCE=supabase mode
 | 202610050001_account_types.sql | Seven account types, amount-owed semantics, credit limits and payments |
 | 202610050002_credit_transfers.sql | Card cash advances up to available credit; correct edits/reversals |
 | 202610050003_session_security.sql | Active-session checks for reads and write RPCs; logout JWT replay denial |
+| 202610050004_banking_revisions.sql | Owner-scoped UUID change tokens, atomic triggers and active-session revision reads |
+| 202610060001_activity_logs.sql | Append-only interaction logs, customer/admin RLS, transactional audit triggers and user filters |
 
 The base migration archives only recognized, empty legacy prototype tables under the private banking_legacy schema, inside its transaction. Populated/unknown tables, external dependencies, custom triggers, or existing archives are refused. It does not drop data or guess ownership. Do not expose banking_legacy through Supabase's API.
 
 ## Seed data
+
+The seventh migration is applied to the configured sandbox. The revision table receives a new UUID when an owner's account, transaction or transfer is inserted, changed or deleted. Triggers participate in the original transaction, so rollback restores the token too. No-op updates and idempotent retries leave it unchanged. Revision reads require an active session and obey owner RLS; direct writes are denied.
 
 - seed.sql creates Checking/Savings accounts and matching signed opening ledger entries for the allowlisted existing demo users.
 - demo-activity.sql adds representative income/expenses and an internal transfer.
@@ -38,7 +42,7 @@ The runner verifies the project target, endpoint hostname, and TLS certificate; 
 
 ## Ownership, money, and sessions
 
-All amounts use bounded integer cents. Accounts, transactions, transfers, and banking_changes are owner-scoped. Composite foreign keys prevent referencing another owner's account/receipt. Both roles have the same financial ownership restrictions; service-role use stays limited to setup and the authorized user directory.
+All amounts use bounded integer cents. Accounts, transactions, transfers, and banking_changes are owner-scoped. Composite foreign keys prevent referencing another owner's account/receipt. Both roles have the same financial workspace ownership restrictions; administrators additionally read all activity logs. Service-role use stays server-only for setup, the authorized user directory and trusted activity writes. See [activity logs](ACTIVITY_LOGS.md).
 
 Authenticated users cannot write tables directly. transfer_funds and manage_banking_record validate ownership, active status, currencies, balances/credit, exact amounts, and retry details before atomic updates. Account locks are acquired in stable order. Card advances increase debt and destination funds; debt payments decrease the source funds and destination debt. Generated entries remain protected, and reversals preserve receipts/audit history.
 

@@ -1,0 +1,15 @@
+# Refresh and database change detection
+
+Every signed-in application page includes an accessible, 44px refresh icon with arrowheads near its title: Analytics, Accounts, Transactions, Transfers, Profile, User directory, and Logs. Banking refresh keeps search, current rows and dialogs in place, disables duplicate clicks, and reports unchanged data or a fetch failure. Failed checks never replace existing data with fixtures.
+
+In Supabase mode, GET /api/banking/revision returns only the authenticated owner's opaque UUID. The banking_revisions table is updated by triggers on accounts, transactions and transfers, including changes made outside the UI. Those updates commit or roll back with the original mutation. Idempotent retries and no-op updates do not rotate it. An owner with no banking data receives a fixed zero UUID until their first record is created. Fixture-only mode uses a fixed token because those files are immutable at runtime.
+
+Accounts, Transactions and Transfers compare the token to the revision included in their last snapshot. Analytics compares it along with currency, browser time zone and current calendar month. If unchanged, they skip the full data request; otherwise they fetch and display the latest view. The workspace retains its existing latest-200 transaction/transfer limit. A snapshot's revision is read before its rows, so a concurrent mutation cannot stamp older data with a newer token. Separate REST reads still do not promise a transactionally consistent multi-table snapshot; another refresh can reconcile concurrent activity.
+
+Profile and the administrator's directory use Next.js router.refresh because they read Supabase Auth data rather than the banking tables. Profile fields are reinitialized from refreshed metadata. The demo dropdown is always rendered at every breakpoint; it is disabled with explanatory text if demo credentials are not configured. DEMO_LOGIN_ENABLED remains an explicit opt-in for publishing demo passwords.
+
+This is manual refresh plus refresh after assistant transfers, not periodic polling or a realtime subscription. It saves payload/analytics work when unchanged, but the small authenticated revision check still makes a network request. The revision endpoint and table require active sessions and owner RLS, use private/no-store caching, and permit no direct customer writes.
+
+Apply 202610050004_banking_revisions.sql once on a previously migrated project before deploying this app. It is already applied to the configured sandbox. Run npm run test:database for trigger/rollback/session/ownership tests, npm test for endpoint authorization/error handling, and npm run verify:revisions against a running local production build for hosted token coherence, CRUD invalidation, retries and two-customer isolation. The hosted verification temporarily edits and restores one sample account name without changing any balances; the normal audit records are retained.
+
+Logs refresh starts a new pagination cutoff and fetches the current log page; it does not use the banking revision token.

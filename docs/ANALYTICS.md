@@ -8,6 +8,7 @@ After login, `/dashboard` now displays analytics backed by the signed-in user's 
 - Month boundaries: use the browser's IANA time zone, validated by the API and database. Boundaries include the start of the local month and exclude the start of the next month.
 - Manual credit-card purchases count as expenses alongside cash-account spending. Card payments and cash advances are internal transfers, so they are not counted again as expenses or income. Opening balances, internal transfer entries, and reversal entries are excluded from income/expense analytics. All eligible history is aggregated in PostgreSQL; the workspace's 200-record display limit does not truncate totals or modal details.
 - Refresh, loading, error/retry, empty-category and no-expense states are implemented. Data is not publicly cached. Reads use the authenticated user's Supabase client and invoker functions under RLS.
+- The title refresh icon checks the owner's database revision first. Unchanged data stays visible without fetching another analytics payload. Currency, time zone or calendar-month changes invalidate the cached view even if the database token is unchanged. A changed view also reloads an open category modal.
 
 `202610040003_analytics.sql` is applied to the configured project. Do not rerun it. `demo-analytics-activity.sql` adds representative current-month salary and expenses for the three demo identities, once per user/month. Audit retry keys prevent duplicates and preserve later user edits. To seed it on an already migrated project:
 

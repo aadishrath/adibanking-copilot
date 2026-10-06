@@ -20,8 +20,10 @@
     "verify:analytics": "node --env-file=.env.local scripts/verify-analytics.mjs",
     "verify:assistant": "node --env-file=.env.local scripts/verify-assistant.mjs",
     "test": "jest --runInBand",
-    "test:database": "node --test tests/database.test.mjs tests/credit-card.test.mjs tests/session-security.test.mjs",
+    "test:database": "node --test tests/database.test.mjs tests/credit-card.test.mjs tests/session-security.test.mjs tests/revisions.test.mjs tests/activity-logs.test.mjs",
     "verify:credit-card": "node --env-file=.env.local scripts/verify-credit-card.mjs",
+    "verify:logs": "node --env-file=.env.local scripts/verify-logs.mjs",
+    "verify:revisions": "node --env-file=.env.local scripts/verify-revisions.mjs",
     "verify:security": "node --env-file=.env.local scripts/verify-security.mjs"
   },
   "dependencies": {

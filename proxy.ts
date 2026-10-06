@@ -6,7 +6,7 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const config = getSupabaseConfig();
   const path = request.nextUrl.pathname;
-  const protectedPage = /^\/(?:profile|dashboard|accounts|transactions|transfers|admin)(?:\/|$)/.test(path);
+  const protectedPage = /^\/(?:profile|dashboard|accounts|transactions|transfers|logs|admin)(?:\/|$)/.test(path);
   const protectedApi = path.startsWith('/api/');
   const deny = () => {
     const denied = protectedApi ? NextResponse.json({ error: 'Sign in to access this resource.' }, { status: 401 }) : NextResponse.redirect(new URL('/login', request.url));
@@ -38,4 +38,4 @@ export async function proxy(request: NextRequest) {
   response.headers.set('Cache-Control', 'private, no-store');
   return response;
 }
-export const config = { matcher: ['/', '/login', '/profile/:path*', '/dashboard/:path*', '/accounts/:path*', '/transactions/:path*', '/transfers/:path*', '/admin/:path*', '/auth/:path*', '/api/:path*'] };
+export const config = { matcher: ['/', '/login', '/profile/:path*', '/dashboard/:path*', '/accounts/:path*', '/transactions/:path*', '/transfers/:path*', '/logs/:path*', '/admin/:path*', '/auth/:path*', '/api/:path*'] };

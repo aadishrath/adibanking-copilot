@@ -1,6 +1,6 @@
 # Implementation progress
 
-Current checkpoint: **October 5, 2026**. The original October 4 prototype assessment is historical; its failures are not the current application status.
+Current checkpoint: **October 6, 2026**. The original October 4 prototype assessment is historical; its failures are not the current application status.
 
 ## Implemented and verified
 
@@ -15,14 +15,16 @@ Current checkpoint: **October 5, 2026**. The original October 4 prototype assess
 | Cleanup | Removed 11 unused legacy components/hooks/adapters/placeholders and empty legacy directories after reference checks |
 | Expanded accounts | Seven types for each demo user; card limit/debt/available credit, sample purchases/payment; eight-character demo passwords |
 | Credit transfers | Eligible account transfer buttons; card cash advances above current debt up to available credit; payment/advance edits and reversals remain atomic |
-| Security | All 11 endpoint guards, private fixture files, active-session RLS/RPC checks, revoked JWT replay denial, Proxy page/admin coverage, cross-origin JSON mutation rejection |
+| Security | All 14 endpoint-method guards, private fixture files, active-session RLS/RPC checks, revoked JWT replay denial, Proxy page/admin coverage, cross-origin JSON mutation rejection |
 | Documentation | Fresh desktop/mobile captures, explicit user-role comparison, current migration/setup/deployment/security guidance |
+| Refresh | Title-adjacent arrow icon on every signed-in page; per-user database revision checks skip unchanged banking/analytics payloads; login selector remains visible at all breakpoints |
 
-All six migrations in [database setup](BANKING_DATA_SETUP.md) are committed to the configured Supabase sandbox. They must not be rerun there. New checkouts/projects must apply them in the README's order; seeds can be repeated independently.
+All eight migrations in [database setup](BANKING_DATA_SETUP.md) are committed to the configured Supabase sandbox. They must not be rerun there. New checkouts/projects must apply them in the README's order; seeds can be repeated independently.
 
 ## Latest validation
 
-- 32 unit/API tests and 9 isolated PostgreSQL tests pass; lint, TypeScript validation, and production build pass.
+- 49 unit/API tests and 11 isolated PostgreSQL tests pass; lint, TypeScript validation, and production build pass.
+- October 6 logout regression: all three demo profiles return to one guest navbar without a retained account menu; account switching and 375 × 812 phone logout checked. Logout replaces the document after session revocation to discard the previous user's client tree.
 - Hosted auth/banking/assistant/security checks pass for normal behavior, customer isolation, admin restrictions, transfer retry/concurrency, logout/token replay, cache headers, and mutation protection.
 - Hosted card checks pass for purchases, limit enforcement, cash advances above current debt, amount edits/reversals, overpayment denial, and balance restoration.
 - Browser checks cover demo logins, analytics drill-down, profiles/menu/logout, account controls, responsive layouts, and card-aware assistant previews.

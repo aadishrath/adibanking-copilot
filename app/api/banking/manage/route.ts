@@ -1,3 +1,4 @@
+import { withActivity } from '@/lib/activity-api';
 import { NextResponse } from 'next/server';
 import { ACCOUNT_TYPES } from '@/types/account';
 import { z } from 'zod';
@@ -16,7 +17,7 @@ const schema=z.union([
   z.object({...base,kind:z.literal('transfers'),operation:z.literal('update'),values:z.object({amount_cents:z.number().int().positive().max(100000000)}).strict()}).strict(),
   z.object({...base,kind:z.enum(['accounts','transactions','transfers']),operation:z.literal('delete'),values:z.object({}).strict()}).strict(),
 ]);
-export async function POST(request:Request){
+async function handlePOST(request:Request){
   try{
     const viewer=await getViewer();
     if(!viewer)throw new ApiError(401,'Sign in to manage your records.');
@@ -34,3 +35,5 @@ export async function POST(request:Request){
     return NextResponse.json(await getBankingSnapshot(viewer.id),{headers:{'Cache-Control':'private, no-store'}});
   }catch(error){return apiFailure(error);}
 }
+
+export const POST = withActivity(handlePOST);

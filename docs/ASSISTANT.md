@@ -31,7 +31,7 @@ Chat history, including unresolved confirmations, is kept in per-user localStora
 
 ## Configuration and failure messages
 
-Set `BANKING_DATA_SOURCE=supabase` after applying all six migrations listed in [database setup](BANKING_DATA_SETUP.md). The assistant reuses the banking RPCs, including card transfers and active-session security.
+Set `BANKING_DATA_SOURCE=supabase` after applying all eight migrations listed in [database setup](BANKING_DATA_SETUP.md). The assistant reuses the banking RPCs, including card transfers and active-session security.
 
 Set a server-only `CHAT_TRANSFER_SIGNING_SECRET` with at least 32 random characters on every instance of the deployment. Keep the value consistent across instances and restarts. Generate it with a cryptographic random generator; do not commit it or prefix it with `NEXT_PUBLIC_`. Rotating it invalidates outstanding proposals. Reads and help work without this secret; chat transfer preparation reports missing configuration and points to Transfers.
 

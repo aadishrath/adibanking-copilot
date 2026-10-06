@@ -2,7 +2,7 @@
 
 ## Findings and fixes
 
-Signed-out requests to all 11 API routes returned HTTP 401 with an error body on both the local production build and the live Vercel deployment. Protected pages redirected to Login. A network response by itself does not mean banking data was returned; DevTools also retains earlier authorized responses after logout.
+Signed-out requests to all 14 current API methods (13 routes) returned HTTP 401 with an error body on the local production build. The earlier live Vercel audit covered its 11 deployed routes; the new revision and log endpoints still need app deployment. Protected pages redirected to Login. A network response by itself does not mean banking data was returned; DevTools also retains earlier authorized responses after logout.
 
 Two gaps were reproduced:
 
@@ -18,6 +18,9 @@ The app data access layer fails closed when the active-session check fails. Prox
 | GET | /api/accounts | Authenticated owner |
 | GET | /api/transactions | Authenticated owner |
 | GET | /api/banking | Authenticated owner |
+| GET | /api/banking/revision | Active authenticated session, owner-only UUID via RLS |
+| GET | /api/logs | Active session; customer own rows, admin all rows and user filter |
+| POST | /api/logs | Active session; validated browser event types, server-derived actor and origin checks |
 | GET | /api/analytics | Authenticated owner via RLS |
 | GET | /api/analytics/transactions | Authenticated owner via RLS |
 | POST | /api/banking/manage | Authenticated owner, validated input, atomic RPC |
@@ -30,6 +33,10 @@ The app data access layer fails closed when the active-session check fails. Prox
 /auth/callback is public by design and exchanges a Supabase one-use authorization code using the PKCE session. Login is public; logout revokes the current session; profile changes require authentication. Demo credentials on Login are intentionally public when DEMO_LOGIN_ENABLED is enabled. Service-role and signing secrets must remain server-only.
 
 ## Reproduce
+
+Activity logs add a deliberate exception to cross-user audit visibility: administrators can read every user's activity details, while banking workspace RLS remains owner-only. Admin status is checked against current protected auth.users metadata. Log rows deny direct authenticated insert/update/delete; trusted server writes use a restricted service-role RPC. Browser events cannot spoof actors or backend login/transfer event types. The user-filter RPC denies customer and revoked-session access. See [logging scope and limitations](ACTIVITY_LOGS.md).
+
+The banking_revisions table has an owner/active-session SELECT policy and denies direct authenticated writes. The revision RPC rejects revoked sessions, including direct access using a saved JWT. Revision responses contain only the current owner's opaque token, use private/no-store headers, and ignore supplied user IDs. Tokens reveal no balances or other users' changes. The seventh migration is applied to the hosted database.
 
 Run npm run verify:security with a production build running on localhost:3100 (or set SECURITY_TEST_URL to the rebuilt app). It discovers the API routes and fails if a new route is missing from its audit. Checks include anonymous/malformed/forged/expired/revoked cookies, private/no-store cache headers, protected page and RSC requests, former public JSON/environment paths, both customers' API and RLS isolation, cross-user RPC mutations, admin-page denial, cross-origin requests, direct-write denial, and direct JWT replay after logout. Security checks do not change balances.
 

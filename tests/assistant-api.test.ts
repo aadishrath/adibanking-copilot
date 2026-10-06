@@ -1,3 +1,4 @@
+jest.mock('@/lib/activity',()=>({recordActivity:jest.fn(async()=>true)}));
 import { beforeEach, describe, expect, test } from '@jest/globals';
 declare const jest: typeof import('@jest/globals').jest;
 jest.mock('server-only',()=>({}),{virtual:true});

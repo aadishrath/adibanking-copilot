@@ -1,10 +1,10 @@
 # Deployment and live/local parity
 
-Updated October 5, 2026. The public app is [adibanking-copilot.vercel.app](https://adibanking-copilot.vercel.app/). README screenshots show the current local production build, not a claim that every change is already deployed.
+Updated October 6, 2026. The public app is [adibanking-copilot.vercel.app](https://adibanking-copilot.vercel.app/). README screenshots show the local production build, not a claim that every change is already deployed.
 
 ## Current checkpoint
 
-All six database migrations are applied to the configured Supabase project, including seven account types, credit-card advances, and active-session security. Anonymous live API checks returned 401 without banking records. The last live-site check still found /mock-data/*.json publicly served; those files have been moved to server-only fixtures locally. Deploy the updated app to remove the hosted copies and receive the current UI, Proxy guards, and JSON origin checks. No deployment was performed during the documentation update.
+All eight database migrations are applied to the configured Supabase project, including change tokens and activity logs. The October 6 deployment investigation confirmed that GitHub commit 7997b87 had a successful Production deployment; refresh and Logs changes remain uncommitted locally and are not included in that deployment. Commit/push current app changes to deploy them. Production also needs DEMO_LOGIN_ENABLED/DEMO_LOGIN_ACCOUNTS for usable demo credentials and the server-only SUPABASE_SERVICE_ROLE_KEY for auth/UI/request logging. The older October 5 static-fixture finding is historical; current live fixture URLs have not been re-audited during this feature implementation.
 
 ## Hosting configuration
 
@@ -14,7 +14,7 @@ Use Node.js 22.x, install with npm ci, and build with npm run build. Vercel shou
 | --- | --- |
 | NEXT_PUBLIC_SUPABASE_URL | Dedicated demo Supabase project URL |
 | NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY | Public publishable/anon key, never a service key |
-| SUPABASE_SERVICE_ROLE_KEY | Server-only admin directory key |
+| SUPABASE_SERVICE_ROLE_KEY | Server-only admin directory and activity logging key |
 | NEXT_PUBLIC_APP_URL | https://adibanking-copilot.vercel.app |
 | BANKING_DATA_SOURCE | supabase after migration/verification |
 | CHAT_TRANSFER_SIGNING_SECRET | Random server-only value of at least 32 characters; consistent across instances |
@@ -25,7 +25,7 @@ No OpenAI key/model is required: the assistant uses application commands and own
 
 ## Release checks
 
-1. Confirm the schema matches all six migration filenames in the README. Never rerun committed migrations. Local build and database state must be deployed compatibly: persistent auth fails closed without the active-session helper.
+1. Confirm the schema matches all eight migration filenames in the README. Never rerun committed migrations. Local build and database state must be deployed compatibly: persistent auth fails closed without the active-session helper, and data refresh requires the revision RPC. All eight migrations are already applied to the configured sandbox; deploy current app files to activate refresh and Logs. The activity writer requires the server-only service-role key.
 2. Synchronize the hosted demo-password JSON; passwords changed to eight characters in Supabase. Confirm no private data shares the public demo project.
 3. Run routine checks and a production build, then deploy through the project's normal Vercel/Git workflow.
 4. Verify signed-out APIs return 401, protected pages redirect, and the former /mock-data/*.json URLs return 404. Verify role navigation, card advance/payment controls, and the assistant's signed confirmation.

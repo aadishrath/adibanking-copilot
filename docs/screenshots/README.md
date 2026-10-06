@@ -17,6 +17,8 @@ Refreshed October 5, 2026 from the local production build at localhost:3100 usin
 | [mobile-accounts.jpg](mobile-accounts.jpg) | Phone account cards and transfer controls |
 | [mobile-analytics.jpg](mobile-analytics.jpg) | Full phone analytics with contained horizontal table scrolling |
 | [mobile-chat-transfer.jpg](mobile-chat-transfer.jpg) | Unsubmitted assistant card advance with explicit Confirm/Cancel |
+| [admin-logs.jpg](admin-logs.jpg) | October 6: admin log table, All users filter, type-only search and pagination |
+| [mobile-logs.jpg](mobile-logs.jpg) | October 6: phone log controls and contained table scrolling |
 
 All records are sample data; sharing screenshots does not publish service-role keys, signing secrets, database passwords, or access tokens. The login selector deliberately shows designated public demo credentials. Verification transfers may appear as reversed/audited entries. Balances/history can change between visits, even though each identity's records remain separate from other users.
 

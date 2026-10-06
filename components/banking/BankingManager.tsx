@@ -1,5 +1,7 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import RefreshButton from '@/components/ui/RefreshButton';
+import { fetchBankingRevision } from '@/lib/refresh-banking';
 import Link from 'next/link';
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABELS, isDebtAccount, canFundTransfer, type Account } from '@/types/account';
 import TransferModal from '@/components/ui/TransferModal';
@@ -17,19 +19,34 @@ export default function BankingManager({ kind, initial }: { kind: RecordKind; in
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [pending, setPending] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshBusy = useRef(false);
+  const revision = useRef(initial.revision);
   const [deletion, setDeletion] = useState<{ id: string; label: string } | null>(null);
   const requestId = useRef('');
   const busy = useRef(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const persistent = data.source === 'supabase';
+  const refresh = useCallback(async () => {
+    if (refreshBusy.current || busy.current) return;
+    refreshBusy.current = true; setRefreshing(true); setError(''); setNotice('');
+    try {
+      const signal = AbortSignal.timeout(30000);
+      const current = await fetchBankingRevision(signal);
+      if (current === revision.current) { setNotice('Already up to date.'); return; }
+      const response = await fetch('/api/banking', { cache: 'no-store', signal });
+      const result = await response.json();
+      if (!response.ok) throw Error(result.error ?? 'Could not refresh banking records.');
+      if (!Array.isArray(result.accounts) || !Array.isArray(result.transactions) || !Array.isArray(result.transfers)) throw Error('The server returned invalid banking records.');
+      revision.current = result.revision; setData(result); setNotice('Banking records updated.');
+    } catch (error) { setError(error instanceof Error ? error.message : 'Refresh failed.'); }
+    finally { refreshBusy.current = false; setRefreshing(false); }
+  }, []);
   useEffect(() => {
-    const reload = async () => {
-      try { const response = await fetch('/api/banking'); if (!response.ok) throw Error(); setData(await response.json()); }
-      catch { setError('The chat transfer completed, but this page could not refresh. Reload to see updated records.'); }
-    };
+    const reload = () => { void refresh(); };
     window.addEventListener('adibank:banking-changed', reload);
     return () => window.removeEventListener('adibank:banking-changed', reload);
-  }, []);
+  }, [refresh]);
   const accountName = (id: string) => data.accounts.find(row => row.id === id)?.name ?? 'Account';
   function openEditor(id?: string) {
     requestId.current = crypto.randomUUID(); setError(''); setNotice('');
@@ -44,13 +61,13 @@ export default function BankingManager({ kind, initial }: { kind: RecordKind; in
   }
   function field(name: string, value: string) { setEditor(current => current ? { ...current, values: { ...current.values, [name]: value } } : null); }
   async function mutate(operation: 'create' | 'update' | 'delete', id: string, values: Record<string, string | number>) {
-    if (busy.current) return; busy.current = true; setPending(true); setError(''); setNotice('');
+    if (busy.current || refreshBusy.current) return; busy.current = true; setPending(true); setError(''); setNotice('');
     try {
       const response = await fetch('/api/banking/manage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, operation, id, requestId: requestId.current, values }) });
       const result = response.headers.get('content-type')?.includes('application/json') ? await response.json() : null;
       if (!response.ok) throw new Error(result?.error ?? 'The change could not be confirmed. Retry the same request.');
       if (!Array.isArray(result?.accounts) || !Array.isArray(result?.transactions) || !Array.isArray(result?.transfers)) throw new Error('Could not confirm updated data. Retry the same request.');
-      setData(result); setEditor(null); setDeletion(null); dialog.current?.close();
+      revision.current = result.revision; setData(result); setEditor(null); setDeletion(null); dialog.current?.close();
       setNotice(operation === 'delete' && kind === 'transfers' ? 'Transfer reversed and archived.' : `Record ${operation === 'create' ? 'created' : operation === 'update' ? 'updated' : 'deleted'}.`);
     } catch (error) { setError(error instanceof Error ? error.message : 'Could not confirm this change.'); }
     finally { busy.current = false; setPending(false); }
@@ -69,10 +86,6 @@ export default function BankingManager({ kind, initial }: { kind: RecordKind; in
   function confirmDelete(id: string, label: string) {
     requestId.current = crypto.randomUUID(); setEditor(null); setError(''); setDeletion({ id, label }); dialog.current?.showModal();
   }
-  async function refresh() {
-    try { const response = await fetch('/api/banking'); if (!response.ok) throw Error('Could not refresh banking records.'); setData(await response.json()); setNotice('Transfer completed.'); }
-    catch (error) { setError(error instanceof Error ? error.message : 'Refresh failed.'); }
-  }
   const query = search.toLowerCase();
   const accounts = data.accounts.filter(row => `${row.name} ${row.accountType?.replaceAll('_', ' ')} ${row.currency} ${row.status}`.toLowerCase().includes(query));
   const entries = data.transactions.filter(row => `${row.description} ${row.category} ${accountName(row.accountId)}`.toLowerCase().includes(query));
@@ -83,7 +96,7 @@ export default function BankingManager({ kind, initial }: { kind: RecordKind; in
   const buttons = (id: string, label: string) => persistent && <div className="flex flex-wrap justify-end gap-2 whitespace-nowrap">{kind === 'accounts' && canFundTransfer(data.accounts.find(a => a.id === id)?.accountType) && <TransferModal accounts={data.accounts.filter(a => a.status === 'active')} defaultFrom={id} defaultTo={data.accounts.find(a => a.status === 'active' && a.id !== id && !isDebtAccount(a.accountType))?.id} triggerLabel={data.accounts.find(a => a.id === id)?.accountType === 'credit_card' ? 'Cash advance' : 'Transfer'} onSuccess={() => void refresh()} />}<button disabled={pending} className={secondary} onClick={() => openEditor(id)}>{kind === 'transfers' ? 'Edit amount' : 'Edit'}</button><button disabled={pending} className={`${secondary} text-red-700`} onClick={() => confirmDelete(id, label)}>{kind === 'transfers' ? 'Reverse & archive' : 'Delete'}</button></div>;
   const accountFlow = (row: Account) => isDebtAccount(row.accountType) && <div className="mt-2 space-y-2 text-xs font-normal text-slate-500"><p>Amount owed: {money(row.balanceCents ?? 0, row.currency)}</p>{row.accountType === 'credit_card' && <p>Limit: {money(row.creditLimitCents ?? 0, row.currency)} · Available credit: {money((row.creditLimitCents ?? 0) - (row.balanceCents ?? 0), row.currency)}</p>}{row.accountType === 'credit_card' && <><p className="font-medium text-slate-700">Recent purchases & payments</p><ul className="space-y-1">{data.transactions.filter(t => t.accountId === row.id).slice(0, 5).map(t => <li key={t.id} className="break-words">{t.description} · {money(t.amountCents ?? 0, row.currency)}</li>)}</ul><Link href="/transactions" className="block text-teal-700 underline">Manage purchases in Transactions</Link></>}{persistent && row.status === 'active' && <TransferModal accounts={data.accounts.filter(a => a.status === 'active')} defaultTo={row.id} triggerLabel={row.accountType === 'credit_card' ? 'Pay card' : 'Make payment'} onSuccess={() => void refresh()} />}</div>;
   return <div className="space-y-6">
-    <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-teal-700">Your banking workspace</p><h1 className="mt-2 text-3xl font-semibold capitalize tracking-tight">{kind}</h1><p className="mt-2 text-sm text-slate-500">Sandbox banking · all amounts are demonstration funds.</p></div>{persistent && (kind === 'transfers' ? <TransferModal accounts={data.accounts.filter(row => row.status === 'active')} onSuccess={() => void refresh()} /> : <button className="primary-button" disabled={pending} onClick={() => openEditor()}>+ {kind === 'accounts' ? 'New account' : 'Add transaction'}</button>)}</div>
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-teal-700">Your banking workspace</p><div className="mt-2 flex items-center gap-3"><h1 className="text-3xl font-semibold capitalize tracking-tight">{kind}</h1><RefreshButton label={`Refresh ${kind}`} busy={refreshing || pending} onRefresh={() => void refresh()} /></div><p className="mt-2 text-sm text-slate-500">Sandbox banking · all amounts are demonstration funds.</p></div>{persistent && (kind === 'transfers' ? <TransferModal accounts={data.accounts.filter(row => row.status === 'active')} onSuccess={() => void refresh()} /> : <button className="primary-button" disabled={pending} onClick={() => openEditor()}>+ {kind === 'accounts' ? 'New account' : 'Add transaction'}</button>)}</div>
     <nav aria-label="Banking records" className="flex flex-wrap gap-2">{(['accounts', 'transactions', 'transfers'] as const).map(tab => <Link key={tab} href={`/${tab}`} aria-current={tab === kind ? 'page' : undefined} className={`${secondary} capitalize ${tab === kind ? 'bg-teal-50 text-teal-800' : ''}`}>{tab}</Link>)}</nav>
     {!persistent && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Shared demo mode. Editing is available after persistent banking is activated.</p>}
     {notice && <p role="status" className="rounded-xl border border-teal-200 bg-teal-50 p-4 text-sm text-teal-800">{notice}</p>}

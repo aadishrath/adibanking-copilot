@@ -22,7 +22,7 @@ Opening, transfer, and reversal ledger entries are protected. A transaction's ac
 
 ## Seeds and limits
 
-The six migrations in [database setup](BANKING_DATA_SETUP.md) are applied to the configured demo project. Repeatable activity and card seeds preserve later edits. To run only seeds on an already migrated sandbox:
+The eight migrations in [database setup](BANKING_DATA_SETUP.md) are applied to the configured demo project. Repeatable activity and card seeds preserve later edits. To run only seeds on an already migrated sandbox:
 
 ~~~sh
 npm run db:migrate -- --seed-only --activity --analytics-activity --credit-activity

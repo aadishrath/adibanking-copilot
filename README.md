@@ -16,7 +16,7 @@ Its engineering purpose is to connect a usable frontend to meaningful backend be
 
 - **Authentication:** Supabase email/password login, protected routes, cookie session refresh, logout, and an opt-in demo credential dropdown that fills the login form.
 - **Profiles:** edit name, email, phone, city, and country. Email changes require Supabase confirmation.
-- **Roles:** customers manage their own banking records. Admins also see the user directory; they do not bypass banking ownership.
+- **Roles:** customers manage their own banking records and read their own logs. Admins also see the user directory and all users' interaction logs; banking workspace ownership remains enforced.
 - **Analytics landing page:** six months of income, expenses, and net savings; current-month expense categories; clickable pie slices and keyboard-accessible legend buttons opening a transaction modal. Aggregation respects timezone and keeps currencies separate.
 - **Accounts:** Checking, Savings, Retirement, Investment, Mortgage, Loan, and Credit Card. Create zero-balance accounts, rename them, change status, and delete empty accounts without history. Cards show amount owed, credit limit, available credit, purchases, and payment controls.
 - **Transactions:** create, search, edit, and remove manual income/expense entries. Balance changes are atomic. Generated opening, transfer, and reversal entries are protected.
@@ -28,11 +28,11 @@ Its engineering purpose is to connect a usable frontend to meaningful backend be
 
 | Demo user | Role | Banking workspace | Extra access |
 | --- | --- | --- | --- |
-| AdiBank Admin — `admin@adibank.example` | Administrator | Own seven seeded account types, transactions, transfers, analytics, assistant, and profile | **Users** navigation and a read-only Supabase user directory |
-| Maya Patel — `maya@adibank.example` | Customer | Maya's own accounts, records, analytics, assistant, and profile | No user-directory access |
-| Alex Morgan — `alex@adibank.example` | Customer | Alex's own accounts, records, analytics, assistant, and profile | No user-directory access |
+| AdiBank Admin — `admin@adibank.example` | Administrator | Own seven seeded account types, transactions, transfers, analytics, assistant, and profile | **Users** directory plus all-user logs with a user filter |
+| Maya Patel — `maya@adibank.example` | Customer | Maya's own accounts, records, analytics, assistant, profile, and logs | No user-directory access |
+| Alex Morgan — `alex@adibank.example` | Customer | Alex's own accounts, records, analytics, assistant, profile, and logs | No user-directory access |
 
-Maya and Alex have the same features, with separate database ownership. The administrator has the same banking features and can view the user directory; administrator access does **not** expose or modify another user's banking records. The directory does not currently support changing roles or managing users. Roles come from protected Supabase `app_metadata`; profile edits cannot grant admin access.
+Maya and Alex have the same features, with separate database ownership. The administrator has the same banking features, the user directory and all users' interaction logs. Admins cannot query or modify another user's banking workspace, but their log view includes other users' audit details such as transfer amounts and account names. The directory does not currently support changing roles or managing users. Roles come from protected Supabase `app_metadata`; profile edits cannot grant admin access.
 
 The login dropdown fills the selected demo credentials. The three demo passwords are eight characters long. Anyone using the same public demo identity shares its sample records, so these are intended for a dedicated sandbox project.
 
@@ -61,6 +61,8 @@ Captured from the current local production build on **October 5, 2026**, with se
 <img src="docs/screenshots/mobile-accounts.jpg" alt="Current account cards at iPhone 12 mini width" width="375">
 
 More captures: [full analytics](docs/screenshots/analytics-dashboard.jpg), [category transactions](docs/screenshots/analytics-category-modal.jpg), [all seven accounts](docs/screenshots/banking-workspace.jpg), and [phone assistant confirmation](docs/screenshots/mobile-chat-transfer.jpg).
+
+Every signed-in page has a refresh icon with arrowheads beside its title. Banking pages check a private, per-user UUID revision before loading another batch of records or analytics. Database triggers rotate that token whenever accounts, transactions or transfers change; unchanged views display “Already up to date” and retain their data. Profile and user directory refresh their server-rendered content. Refresh is manual and also runs after an assistant transfer; this does not poll in the background. See [refresh behavior](docs/DATA_REFRESH.md).
 
 ## Account behavior
 
@@ -91,7 +93,7 @@ Card purchases can be created, edited, or deleted in Transactions when the resul
 
 ## Architecture and trade-offs
 
-**Ownership is enforced at multiple layers.** The server verifies identity, active Supabase session state, and feature permissions. Row-level security scopes financial reads to the authenticated owner, and mutation functions check ownership and session state again. Revoked/expired sessions cannot read banking rows or replay mutations, even using a saved access JWT. Private fixture files live in `lib/fixtures`, outside publicly served assets; see the [security audit](docs/SECURITY.md). Service-role access stays server-only for setup and the admin directory; normal banking uses authenticated user access.
+**Ownership is enforced at multiple layers.** The server verifies identity, active Supabase session state, and feature permissions. Row-level security scopes financial reads to the authenticated owner, and mutation functions check ownership and session state again. Revoked/expired sessions cannot read banking rows or replay mutations, even using a saved access JWT. Private fixture files live in `lib/fixtures`, outside publicly served assets; see the [security audit](docs/SECURITY.md). Service-role access stays server-only for setup, the admin directory and trusted log writes; normal banking uses authenticated user access.
 
 **Money uses integer cents.** Bounded integer values and decimal-string parsing avoid floating-point rounding errors. This currently assumes two decimal places; exchange rates and currencies with different minor units are not implemented.
 
@@ -160,6 +162,8 @@ npm run db:migrate -- --migration=202610040003_analytics.sql --activity --analyt
 npm run db:migrate -- --migration=202610050001_account_types.sql --credit-activity
 npm run db:migrate -- --migration=202610050002_credit_transfers.sql
 npm run db:migrate -- --migration=202610050003_session_security.sql
+npm run db:migrate -- --migration=202610050004_banking_revisions.sql
+npm run db:migrate -- --migration=202610060001_activity_logs.sql
 ```
 
 The scripts create three confirmed Supabase identities, seed all seven account types, card activity, and monthly analytics, and install atomic transfer/CRUD, analytics, and active-session protections. Eight-character demo passwords go into ignored `.env.demo-users.json`. After setup, set `BANKING_DATA_SOURCE=supabase` and optionally `DEMO_LOGIN_ENABLED=true`.
@@ -199,7 +203,7 @@ npm run test:database
 npm run build
 ```
 
-Database tests run actual SQL in isolated PGlite PostgreSQL, including RLS, exact-cent arithmetic, retries, rollback, card limits/advances, analytics boundaries, and revoked/expired sessions. The latest checkpoint has 32 unit/API tests and 9 database tests.
+Database tests run actual SQL in isolated PGlite PostgreSQL, including RLS, exact-cent arithmetic, retries, rollback, card limits/advances, analytics boundaries, and revoked/expired sessions. The latest checkpoint has 49 unit/API tests and 11 database tests.
 
 For integration checks, run the app on port 3100 (`npm run dev -- --port 3100`) with configured, seeded Supabase data:
 
@@ -233,3 +237,5 @@ Read [security verification](docs/SECURITY.md), [screenshot inventory](docs/scre
 ---
 
 © 2026 aadish. Built by aadish. For demonstration purposes only. This notice identifies the author and demo purpose; it does not establish an open-source license.
+
+Interaction logging: see [activity logs](docs/ACTIVITY_LOGS.md) for event coverage, 25-row pagination, type-only search, admin filtering and audit limitations.
