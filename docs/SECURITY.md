@@ -1,6 +1,10 @@
-# Security verification — 2026-10-05
+# Security verification — updated 2026-10-06
 
 ## Findings and fixes
+
+October 6 full catalog audit found an additional exposed legacy table: public.users had RLS disabled and anonymous/authenticated write grants. The earlier endpoint tests covered the six known application tables and missed this unused table. Applied 202610060002_lock_legacy_users.sql to the configured Supabase project: enabled RLS and revoked all table privileges from PUBLIC, anon and authenticated, without deleting rows. The app's user directory uses Supabase Auth's server-side admin API, not public.users.
+
+All seven public tables now have RLS enabled, no anonymous table grants, and no direct authenticated write grants. Direct anonymous Data API requests are denied, as are customer requests to the legacy users table. No public views were found; all nine public security-definer functions deny anonymous execution and use an empty search path. Run npm run verify:database-security for a read-only catalog inventory; run it after adding tables, alongside the behavioral API/RLS checks. This audit does not establish whether any data was accessed before the fix. Rerun Supabase Security Advisor in the configured project to confirm its current findings; old email reports describe the earlier state.
 
 Signed-out requests to all 14 current API methods (13 routes) returned HTTP 401 with an error body on the local production build. The earlier live Vercel audit covered its 11 deployed routes; the new revision and log endpoints still need app deployment. Protected pages redirected to Login. A network response by itself does not mean banking data was returned; DevTools also retains earlier authorized responses after logout.
 

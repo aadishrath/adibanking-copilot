@@ -19,11 +19,12 @@ Current checkpoint: **October 6, 2026**. The original October 4 prototype assess
 | Documentation | Fresh desktop/mobile captures, explicit user-role comparison, current migration/setup/deployment/security guidance |
 | Refresh | Title-adjacent arrow icon on every signed-in page; per-user database revision checks skip unchanged banking/analytics payloads; login selector remains visible at all breakpoints |
 
-All eight migrations in [database setup](BANKING_DATA_SETUP.md) are committed to the configured Supabase sandbox. They must not be rerun there. New checkouts/projects must apply them in the README's order; seeds can be repeated independently.
+All nine migrations in [database setup](BANKING_DATA_SETUP.md) are committed to the configured Supabase sandbox. They must not be rerun there. New checkouts/projects must apply them in the README's order; seeds can be repeated independently.
 
 ## Latest validation
 
-- 49 unit/API tests and 11 isolated PostgreSQL tests pass; lint, TypeScript validation, and production build pass.
+- 49 unit/API tests and 13 isolated PostgreSQL tests pass; lint, TypeScript validation, and production build pass.
+- October 6 complete public-table catalog audit found and locked down legacy public.users without deleting its rows. Anonymous and authenticated legacy-table requests are denied; database security inventory now includes tables outside the app's known endpoint list.
 - October 6 logout regression: all three demo profiles return to one guest navbar without a retained account menu; account switching and 375 × 812 phone logout checked. Logout replaces the document after session revocation to discard the previous user's client tree.
 - Hosted auth/banking/assistant/security checks pass for normal behavior, customer isolation, admin restrictions, transfer retry/concurrency, logout/token replay, cache headers, and mutation protection.
 - Hosted card checks pass for purchases, limit enforcement, cash advances above current debt, amount edits/reversals, overpayment denial, and balance restoration.

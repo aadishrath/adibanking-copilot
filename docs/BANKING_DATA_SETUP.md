@@ -1,6 +1,6 @@
 # Persistent banking database
 
-Updated October 5, 2026. The local app runs in BANKING_DATA_SOURCE=supabase mode with user-owned data. All eight migrations below have been applied to the configured demo Supabase project. Do not rerun them there. The [README](../README.md#run-locally) provides the full fresh-project setup; [deployment](DEPLOYMENT.md) distinguishes hosted database state from deployed app files.
+Updated October 6, 2026. The local app runs in BANKING_DATA_SOURCE=supabase mode with user-owned data. All nine migrations below have been applied to the configured demo Supabase project. Do not rerun them there. The [README](../README.md#run-locally) provides the full fresh-project setup; [deployment](DEPLOYMENT.md) distinguishes hosted database state from deployed app files.
 
 ## Migration order for a new sandbox
 
@@ -14,6 +14,7 @@ Updated October 5, 2026. The local app runs in BANKING_DATA_SOURCE=supabase mode
 | 202610050003_session_security.sql | Active-session checks for reads and write RPCs; logout JWT replay denial |
 | 202610050004_banking_revisions.sql | Owner-scoped UUID change tokens, atomic triggers and active-session revision reads |
 | 202610060001_activity_logs.sql | Append-only interaction logs, customer/admin RLS, transactional audit triggers and user filters |
+| 202610060002_lock_legacy_users.sql | Enable RLS and revoke client access to legacy public.users, preserving its data; no-op when absent |
 
 The base migration archives only recognized, empty legacy prototype tables under the private banking_legacy schema, inside its transaction. Populated/unknown tables, external dependencies, custom triggers, or existing archives are refused. It does not drop data or guess ownership. Do not expose banking_legacy through Supabase's API.
 
@@ -33,6 +34,13 @@ npm run db:migrate -- --seed-only --activity --analytics-activity --credit-activ
 ~~~
 
 Schema and seed are separate transactions. If a migration committed but seeding failed, inspect the database and retry with --seed-only. Do not rerun the committed schema change. The runner requests a PostgREST schema reload and does not silently change BANKING_DATA_SOURCE.
+
+Use --schema-only when applying a security migration without reseeding. For a project missing only the legacy-table lockdown:
+
+~~~sh
+npm run db:migrate -- --migration=202610060002_lock_legacy_users.sql --schema-only
+npm run verify:database-security
+~~~
 
 ## Connection configuration
 

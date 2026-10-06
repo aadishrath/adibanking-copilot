@@ -10,6 +10,11 @@ async function request(path,{cookie='',method='GET',body,headers={}}={}){const r
 function privateResponse(r){assert.match(r.headers.get('cache-control')??'',/private/);assert.match(r.headers.get('cache-control')??'',/no-store/);}
 async function denied(cookie=''){for(const [path,method] of endpoints){const r=await request(path,{method,cookie,...(method==='POST'?{body:{}}:{})});assert.equal(r.status,401,path+' must reject unauthenticated requests');assert.deepEqual(Object.keys(r.data).filter(k=>!['error','requestId'].includes(k)),[]);privateResponse(r);}}
 await denied();await denied('sb-invalid-auth-token=invalid');
+for(const table of ['accounts','transactions','transfers','banking_changes','banking_revisions','activity_logs','users']){
+ const response=await fetch(url+'/rest/v1/'+table+'?select=*&limit=0',{method:'HEAD',headers:{apikey:key},signal:AbortSignal.timeout(15000)});
+ assert.ok([401,403,404].includes(response.status),'Anonymous Data API access must be denied: '+table);
+}
+console.log('Anonymous Data API access denied for all current tables and the legacy users table.');
 for(const path of ['/dashboard','/accounts','/transactions','/transfers','/profile','/logs','/admin/users'])for(const headers of [{},{RSC:'1','Next-Router-Prefetch':'1'}]){const r=await request(path+'?_rsc=security-audit',{headers});assert.ok([303,307].includes(r.status),path+' must redirect');assert.equal(new URL(r.headers.get('location'),base).pathname,'/login');privateResponse(r);}
 for(const path of ['/mock-data/accounts.json','/mock-data/transactions.json','/.env.local','/.env.demo-users.json','/supabase/seed.sql','/lib/fixtures/accounts.json'])assert.equal((await request(path)).status,404,'Public fixtures must be removed.');
 console.log('All 14 endpoint methods, malformed cookies, protected HTML/RSC pages, cache headers and public fixture checks passed.');
@@ -25,6 +30,7 @@ try{
  await denied(forgedCookie);
  console.log('Forged expired cookies and admin/user JWT claims denied across all endpoints.');
  for(const session of sessions){const other=session===a?b:a;
+ const legacy=await session.client.from('users').select('*').limit(0);assert.ok(legacy.error,'Legacy user directory must not be exposed to authenticated clients');
  for(const path of ['/api/accounts','/api/transactions','/api/banking','/api/analytics','/api/analytics/transactions?category=groceries']){const r=await request(path+(path.includes('?')?'&':'?')+'userId='+other.id,{cookie:session.cookie});assert.equal(r.status,200);privateResponse(r);for(const row of other.snapshot.accounts)assert.ok(!r.text.includes(row.id),'Cross-user account exposure');for(const row of other.snapshot.transactions)assert.ok(!r.text.includes(row.id),'Cross-user transaction exposure');}
  const role=await request('/admin/users',{cookie:session.cookie,headers:{RSC:'1'}});assert.equal(role.status,307);assert.equal(new URL(role.headers.get('location'),base).pathname,'/dashboard');
  const cs=await request('/api/transfer',{cookie:session.cookie,method:'POST',body:{},headers:{Origin:'https://attacker.example','Sec-Fetch-Site':'cross-site'}});assert.equal(cs.status,403);

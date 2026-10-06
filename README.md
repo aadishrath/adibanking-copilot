@@ -164,6 +164,8 @@ npm run db:migrate -- --migration=202610050002_credit_transfers.sql
 npm run db:migrate -- --migration=202610050003_session_security.sql
 npm run db:migrate -- --migration=202610050004_banking_revisions.sql
 npm run db:migrate -- --migration=202610060001_activity_logs.sql
+npm run db:migrate -- --migration=202610060002_lock_legacy_users.sql --schema-only
+npm run verify:database-security
 ```
 
 The scripts create three confirmed Supabase identities, seed all seven account types, card activity, and monthly analytics, and install atomic transfer/CRUD, analytics, and active-session protections. Eight-character demo passwords go into ignored `.env.demo-users.json`. After setup, set `BANKING_DATA_SOURCE=supabase` and optionally `DEMO_LOGIN_ENABLED=true`.
@@ -203,7 +205,7 @@ npm run test:database
 npm run build
 ```
 
-Database tests run actual SQL in isolated PGlite PostgreSQL, including RLS, exact-cent arithmetic, retries, rollback, card limits/advances, analytics boundaries, and revoked/expired sessions. The latest checkpoint has 49 unit/API tests and 11 database tests.
+Database tests run actual SQL in isolated PGlite PostgreSQL, including RLS, exact-cent arithmetic, retries, rollback, card limits/advances, analytics boundaries, revoked/expired sessions, and legacy-table lockdown. The latest checkpoint has 49 unit/API tests and 13 database tests. Run `npm run verify:database-security` to inspect every public table's RLS and API grants, including tables unused by the app.
 
 For integration checks, run the app on port 3100 (`npm run dev -- --port 3100`) with configured, seeded Supabase data:
 
