@@ -15,7 +15,8 @@ afterEach(() => {
 
 test('Vercel supplies all three public identities without the ignored local credentials file', async () => {
   const config = JSON.parse(readFileSync('vercel.json', 'utf8'));
-  expect(Object.keys(config.env).sort()).toEqual(['DEMO_LOGIN_ACCOUNTS', 'DEMO_LOGIN_ENABLED']);
+  expect(Object.keys(config.env).sort()).toEqual(['BANKING_DATA_SOURCE', 'DEMO_LOGIN_ACCOUNTS', 'DEMO_LOGIN_ENABLED']);
+  expect(config.env.BANKING_DATA_SOURCE).toBe('supabase');
   Object.assign(process.env, config.env);
   const accounts = await getDemoAccounts();
   expect(accounts.map(account => [account.email, account.role])).toEqual([

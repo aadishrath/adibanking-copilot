@@ -16,7 +16,7 @@ Use Node.js 22.x, install with npm ci, and build with npm run build. Vercel shou
 | NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY | Public publishable/anon key, never a service key |
 | SUPABASE_SERVICE_ROLE_KEY | Server-only admin directory and activity logging key |
 | NEXT_PUBLIC_APP_URL | https://adibanking-copilot.vercel.app |
-| BANKING_DATA_SOURCE | supabase after migration/verification |
+| BANKING_DATA_SOURCE | supabase in vercel.json; migrations and seeded identities already verified |
 | CHAT_TRANSFER_SIGNING_SECRET | Random server-only value of at least 32 characters; consistent across instances |
 | DEMO_LOGIN_ENABLED | true in vercel.json for this public sandbox deployment |
 | DEMO_LOGIN_ACCOUNTS | Three public sandbox identities in vercel.json, synchronized with Supabase Auth |
