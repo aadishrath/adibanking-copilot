@@ -25,6 +25,8 @@ No OpenAI key/model is required: the assistant uses application commands and own
 
 The vercel.json env entries are deliberately public demo configuration. For a private deployment, remove those entries and manage demo settings through Vercel Project Settings. After rotating demo passwords, update the allowlisted JSON in vercel.json and redeploy. Infrastructure credentials must never be added to that file.
 
+Run npm run verify:public-demo after deployment. It checks all three published demo identities, database-backed account reads, activity writes, admin user directory access, and signed assistant transfer previews against the live URL. It never confirms a transfer. DEMO_TEST_URL can target a different deployment. The verifier needs the local Supabase public configuration and a trusted network connection; it never prints credentials or confirmation tokens.
+
 ## Release checks
 
 1. Confirm the schema matches all nine migration filenames in the README. Never rerun committed migrations. Local build and database state must be deployed compatibly: persistent auth fails closed without the active-session helper, and data refresh requires the revision RPC. All nine migrations are already applied to the configured sandbox; deploy current app files to activate refresh and Logs. The activity writer requires the server-only service-role key.

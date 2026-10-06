@@ -13,6 +13,7 @@
     "type-check": "tsc --noEmit",
     "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
     "verify:auth": "node --env-file=.env.local scripts/verify-auth.mjs",
+    "verify:public-demo": "node --env-file=.env.local scripts/verify-public-demo.mjs",
     "verify:banking": "node --env-file=.env.local scripts/verify-banking.mjs",
     "db:migrate": "node --env-file=.env.local scripts/migrate-banking.mjs",
     "db:diagnose": "node scripts/diagnose-database.mjs",

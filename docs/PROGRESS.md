@@ -23,7 +23,7 @@ All nine migrations in [database setup](BANKING_DATA_SETUP.md) are committed to 
 
 ## Latest validation
 
-- 49 unit/API tests and 13 isolated PostgreSQL tests pass; lint, TypeScript validation, and production build pass.
+- 53 unit/API tests and 13 isolated PostgreSQL tests pass; lint, TypeScript validation, and production build pass.
 - October 6 complete public-table catalog audit found and locked down legacy public.users without deleting its rows. Anonymous and authenticated legacy-table requests are denied; database security inventory now includes tables outside the app's known endpoint list.
 - October 6 logout regression: all three demo profiles return to one guest navbar without a retained account menu; account switching and 375 × 812 phone logout checked. Logout replaces the document after session revocation to discard the previous user's client tree.
 - Hosted auth/banking/assistant/security checks pass for normal behavior, customer isolation, admin restrictions, transfer retry/concurrency, logout/token replay, cache headers, and mutation protection.
