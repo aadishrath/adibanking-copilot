@@ -28,7 +28,7 @@ npm run seed:users creates/auto-confirms only the three designated demo identiti
 npm run seed:users -- --reset-demo-passwords
 ~~~
 
-DEMO_LOGIN_ENABLED=true shows the highlighted selector. Local credentials are loaded server-side from the ignored file. For hosting, set DEMO_LOGIN_ACCOUNTS to the allowlisted email/password/role JSON array and synchronize it after rotating Supabase passwords. The selector intentionally publishes sandbox credentials; never enable it in a project containing private user data or commit service/database credentials.
+DEMO_LOGIN_ENABLED=true shows the highlighted selector. Local credentials are loaded server-side from the ignored file. This public Vercel demo supplies the flag and the three allowlisted email/password/role records through vercel.json, so visitors can sign in without a local repository. Synchronize that JSON after rotating Supabase passwords. The selector intentionally publishes sandbox credentials; never enable it in a project containing private user data or commit service/database credentials.
 
 ![Current demo selector](screenshots/login-demo-dropdown.jpg)
 

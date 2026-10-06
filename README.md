@@ -205,7 +205,7 @@ npm run test:database
 npm run build
 ```
 
-Database tests run actual SQL in isolated PGlite PostgreSQL, including RLS, exact-cent arithmetic, retries, rollback, card limits/advances, analytics boundaries, revoked/expired sessions, and legacy-table lockdown. The latest checkpoint has 49 unit/API tests and 13 database tests. Run `npm run verify:database-security` to inspect every public table's RLS and API grants, including tables unused by the app.
+Database tests run actual SQL in isolated PGlite PostgreSQL, including RLS, exact-cent arithmetic, retries, rollback, card limits/advances, analytics boundaries, revoked/expired sessions, and legacy-table lockdown. The latest checkpoint has 53 unit/API tests and 13 database tests. Run `npm run verify:database-security` to inspect every public table's RLS and API grants, including tables unused by the app.
 
 For integration checks, run the app on port 3100 (`npm run dev -- --port 3100`) with configured, seeded Supabase data:
 

@@ -4,7 +4,7 @@ Updated October 6, 2026. The public app is [adibanking-copilot.vercel.app](https
 
 ## Current checkpoint
 
-All nine database migrations are applied to the configured Supabase project, including change tokens and activity logs. The October 6 deployment investigation confirmed that GitHub commit 7997b87 had a successful Production deployment; refresh and Logs changes remain uncommitted locally and are not included in that deployment. Commit/push current app changes to deploy them. Production also needs DEMO_LOGIN_ENABLED/DEMO_LOGIN_ACCOUNTS for usable demo credentials and the server-only SUPABASE_SERVICE_ROLE_KEY for auth/UI/request logging. The older October 5 static-fixture finding is historical; current live fixture URLs have not been re-audited during this feature implementation.
+All nine database migrations are applied to the configured Supabase project. The public demo login configuration is now included in vercel.json: it enables the selector and supplies exactly the three intentionally public sandbox identities. It does not depend on ignored local credential files. Supabase keys, database credentials, and transfer signing secrets remain private Vercel project environment variables. The live UI must be checked after each deployment; a successful local build alone does not establish deployed behavior.
 
 ## Hosting configuration
 
@@ -18,10 +18,12 @@ Use Node.js 22.x, install with npm ci, and build with npm run build. Vercel shou
 | NEXT_PUBLIC_APP_URL | https://adibanking-copilot.vercel.app |
 | BANKING_DATA_SOURCE | supabase after migration/verification |
 | CHAT_TRANSFER_SIGNING_SECRET | Random server-only value of at least 32 characters; consistent across instances |
-| DEMO_LOGIN_ENABLED | true only for public sandbox identities |
-| DEMO_LOGIN_ACCOUNTS | Allowlisted demo email/password/role JSON, synchronized with Supabase Auth |
+| DEMO_LOGIN_ENABLED | true in vercel.json for this public sandbox deployment |
+| DEMO_LOGIN_ACCOUNTS | Three public sandbox identities in vercel.json, synchronized with Supabase Auth |
 
 No OpenAI key/model is required: the assistant uses application commands and owned data. DATABASE_URL and optional DATABASE_CA_CERT_PATH are for local migration tooling, not runtime banking. Do not upload .env.local or .env.demo-users.json. Add the production /auth/callback URL to Supabase's allowed redirect URLs and align the Auth Site URL with the app origin.
+
+The vercel.json env entries are deliberately public demo configuration. For a private deployment, remove those entries and manage demo settings through Vercel Project Settings. After rotating demo passwords, update the allowlisted JSON in vercel.json and redeploy. Infrastructure credentials must never be added to that file.
 
 ## Release checks
 
